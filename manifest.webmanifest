@@ -1,0 +1,14 @@
+{
+  "name": "Habitat Gym meal planner",
+  "short_name": "Meal Planner",
+  "description": "Your Habitat Gym meal plan, recipes, prep plan and shopping list.",
+  "start_url": "https://go.habitatgym.com.au/meal-planner",
+  "display": "standalone",
+  "background_color": "#0B1F16",
+  "theme_color": "#0B1F16",
+  "icons": [
+    {"src": "https://jeannie-habitat.github.io/habitat-meals/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "https://jeannie-habitat.github.io/habitat-meals/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "https://jeannie-habitat.github.io/habitat-meals/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
