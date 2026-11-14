@@ -495,8 +495,8 @@ function detailHtml(r){
   if((r.tags||[]).length)h+='<div class="tags" style="margin-bottom:12px">'+r.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')+'</div>';
   if(r.custom&&r.est)h+='<p class="small muted">Numbers estimated from the ingredients'+(r.serves>1?', per serve (makes '+r.serves+')':'')+'.</p>';
   if(r.custom&&!(r.ingredients||[]).length)h+='<p class="small muted">'+(r.readymade?'Ready-made. It shows under “Ready-made meals” on your shopping list.':'No ingredients saved, so this isn’t on your shopping list. Tap Edit to add some.')+'</p>';
-  else if(r.batch)h+='<h3>Ingredients <span class="small muted" style="font-weight:400">whole batch, makes '+r.batch+' serves</span></h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul><p class="note">Your portion is '+(x===1?'1 serve':frac(x)+' serves')+' of the '+r.batch+'. The kcal and macros above are for your portion.</p>';
-  else h+='<h3>Ingredients'+(x!==1?' <span class="small muted" style="font-weight:400">for your portion (×'+frac(x)+')</span>':'')+'</h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(scaleLine(i,x))+'</li>'}).join('')+'</ul>';
+  else if(r.batch)h+=(function(){var L=r.ingredients||[],I=ingInfo(L,kcal(r)*r.batch);return '<h3>Ingredients <span class="small muted" style="font-weight:400">whole batch, makes '+r.batch+' serves</span></h3><ul>'+L.map(function(i,j){return ingLi(i,I[j])}).join('')+'</ul><p class="small muted">Calories next to each ingredient are for the whole batch.</p>'+swapTips(L)})()+'<p class="note">Your portion is '+(x===1?'1 serve':frac(x)+' serves')+' of the '+r.batch+'. The kcal and macros above are for your portion.</p>';
+  else h+=(function(){var L=(r.ingredients||[]).map(function(i){return scaleLine(i,x)}),I=ingInfo(L,r.custom?0:kcal(r)*x);return '<h3>Ingredients'+(x!==1?' <span class="small muted" style="font-weight:400">for your portion (×'+frac(x)+')</span>':'')+'</h3><ul>'+L.map(function(i,j){return ingLi(i,I[j])}).join('')+'</ul>'+(I.some(function(z){return z&&z.cal>=2.5})?'<p class="small muted">Calories next to each ingredient are rounded estimates for your portion.</p>':'')+(r.custom?'':swapTips(L))})();
   if(r.gfnote&&S.targets.gf)h+='<p class="note">'+esc(r.gfnote)+'</p>';
   if(r.flavour)h+='<div class="flavour"><b>Make it taste great</b><p>'+esc(r.flavour)+'</p></div>';
   if((r.steps||[]).length)h+='<h3>Method</h3><ol>'+(r.steps||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ol>';
@@ -543,7 +543,7 @@ var EST_RULES=[
  [/fat[- ]free cream cheese/,'ff_cc'],[/(light|lite) cream cheese/,'light_cc'],[/cream cheese/,'cream_cheese'],
  [/babybel/,'babybel'],[/tzatziki/,'tzatziki'],[/hummus/,'hummus'],
  [/high[- ]protein.*milk|protein milk/,'protein_milk'],[/almond milk/,'almond_milk'],[/soy milk/,'soy_milk'],[/oat cream/,'oat_cream'],[/coconut milk|coconut cream/,'coconut_light'],[/evaporated milk/,'evap_milk'],[/light cream|cream\b/,'light_cream'],[/milk/,'milk'],
- [/butter\b(?!.*chicken)/,'butter'],[/margarine/,'marg'],
+ [/^(?!.*(peanut|nut|almond|cashew) butter).*butter\b(?!.*chicken)/,'butter'],[/margarine/,'marg'],
  [/whey|protein powder|plant protein|protein isolate/,'whey'],
  [/tofu/,'tofu'],[/tempeh/,'tempeh'],[/tvp|soy mince/,'tvp'],[/edamame/,'edamame'],
  [/red lentils?/,'red_lentils'],[/lentils?/,'lentils_tin'],[/chickpeas?/,'chickpeas'],[/black beans?/,'black_beans'],[/kidney beans?/,'kidney_beans'],[/cannellini|white beans?|butter beans?/,'cannellini'],
@@ -562,12 +562,13 @@ var EST_RULES=[
  [/honey/,'honey'],[/maple/,'maple'],[/sugar[- ]free (maple )?syrup/,'sf_syrup'],[/sugar|caster|brown sugar/,'sugar'],[/cocoa|cacao/,'cocoa'],[/dark choc|chocolate chips|choc chips/,'dark_choc'],[/chocolate/,'milk_choc'],[/nutella/,'nutella'],[/flour/,'flour'],[/cornflour|cornstarch/,'cornflour'],[/coffee/,'coffee']
 ];
 EST_RULES.unshift([/milky way|fun size|snickers|mars bar|twix|kit ?kat|\bbar\b.*\(/,'__none'],[/stock|broth|bouillon/,'stock'],[/fish sauce/,'fish_sauce'],[/olive oil|(?:^|\s)oil\b|cooking spray/,'olive_oil'],[/cherry tomato/,'tomato'],[/lettuce cups?/,'lettuce_cup']);
-var EST_PC={bacon:30,olives:4,dumplings:25,dumpling:25,sriracha:5,protein_bar:60,egg:50,egg_white:33,banana:120,apple:150,mandarin:80,kiwi:75,avocado:150,mango:250,tomato:120,onion:150,capsicum:200,carrot:120,potato:150,sweet_potato:250,zucchini:200,cucumber:100,eggplant:300,bread:40,sourdough:50,wrap:60,pita:60,bagel:90,thins:50,roll:60,croissant:60,taco_shell:12,corn_tortilla:30,rice_paper:8,rice_cakes:9,crackers:6,babybel:20,lettuce:400,peach:150,dates:8,mushroom:20,cherries:8};
+EST_RULES.push([/biscoff|biscuits?\b/,'biscuit']);
+var EST_PC={biscuit:8,bacon:30,olives:4,dumplings:25,dumpling:25,sriracha:5,protein_bar:60,egg:50,egg_white:33,banana:120,apple:150,mandarin:80,kiwi:75,avocado:150,mango:250,tomato:120,onion:150,capsicum:200,carrot:120,potato:150,sweet_potato:250,zucchini:200,cucumber:100,eggplant:300,bread:40,sourdough:50,wrap:60,pita:60,bagel:90,thins:50,roll:60,croissant:60,taco_shell:12,corn_tortilla:30,rice_paper:8,rice_cakes:9,crackers:6,babybel:20,lettuce:400,peach:150,dates:8,mushroom:20,cherries:8};
 var EST_CUP={oats:90,rice_dry:190,flour:125,spinach:30,lettuce:40,berries:150,corn:160,quinoa_dry:170,mixed_veg:150,cheddar:110,light_cheese:110,greek_yog:245,hp_yoghurt:250,cottage:220,milk:250,almond_milk:250,soy_milk:250,broccoli:90,carrot:130,zucchini:120,mushroom:70,pasta:100,rice_noodles:60,couscous_dry:170,white_rice:160,granola:100,muesli:100,slaw:90,sprouts:30,cauliflower:100,capsicum:140,tomato:150,cucumber:130,onion:160,egg_white:240,whey:120,chickpeas:160,black_beans:180,lentils_tin:190,red_lentils:190,kidney_beans:180,cannellini:180,edamame:150};
 function estGrams(p,key){
   var q=p.q,u=p.unit,pm=!u&&p.name.match(/\((?:about |approx\.? |around )?(\d+(?:\.\d+)?)\s*(?:g|ml)\)/);if(pm)return q*parseFloat(pm[1]);
   if(u==='g'||u==='ml')return q;if(u==='kg'||u==='L')return q*1000;
-  if(u==='tsp')return q*5;if(u==='tbsp')return q*(key==='pb'||key==='honey'?20:15);
+  if(u==='tsp')return q*(/^(pb|honey|maple|nutella|tahini)$/.test(key)?7:5);if(u==='tbsp')return q*(key==='pb'||key==='honey'?20:15);
   if(/^cups?$/.test(u))return q*(EST_CUP[key]||240);
   if(key==='lettuce_cup'||/^(lettuce|iceberg|cos).*cups?$/.test(p.name))return q*15;
   if(/^(thin |small )?slices?\b/.test(p.name)&&!u){return q*(key==='onion'||key==='tomato'||key==='cucumber'?12:key==='bread'||key==='sourdough'?40:key==='cheddar'||key==='light_cheese'?20:15)}
@@ -588,6 +589,30 @@ function estimate(lines){var NUT=__NUT;
   return {p:P,c:C,f:F,ok:ok,bad:bad}}
 
 
+/* ---------- per-ingredient calories, spoon grams and swap tips (recipe page) ---------- */
+function ingNorm(s){return String(s).replace(/(\d+)?\s*([¼½¾⅓⅔])/,function(m,w,f){return String((+w||0)+{'¼':.25,'½':.5,'¾':.75,'⅓':1/3,'⅔':2/3}[f])+' '}).replace(/\s+/g,' ').trim()}
+function ingInfo(lines,total){
+  var out=lines.map(function(line0){var line=ingNorm(line0);var e=estimate([line]);if(e.bad.length||!e.ok.length)return null;var o=e.ok[0],p=split(String(line).trim());
+    var sp=p&&/^(tsp|tbsp|cups?)$/.test(p.unit)&&o[2]&&!/\d\s*(g|ml)\)/.test(line)?Math.round(o[1]):0;
+    return {cal:o[2]?4*e.p+4*e.c+9*e.f:0,sp:sp}});
+  var sum=0,all=true;out.forEach(function(x){if(!x)all=false;else sum+=x.cal});
+  if(all&&sum>0&&total>0&&total/sum>0.75&&total/sum<1.33){var f=total/sum;out.forEach(function(x){x.cal*=f})}
+  return out}
+function ingLi(line,info){
+  var t=esc(line);if(!info)return '<li>'+t+'</li>';
+  if(info.sp)t+=' <span class="muted">(about '+info.sp+'g)</span>';
+  if(info.cal>=2.5)t+=' <span class="muted" style="white-space:nowrap">· '+(info.cal<20?Math.round(info.cal):Math.round(info.cal/5)*5)+' cal</span>';
+  return '<li>'+t+'</li>'}
+var SWAPS=[[/high[- ]protein (greek )?yog|protein yog/i,'<b>High-protein yoghurt</b> (YoPro, Chobani Fit or similar). Regular Greek-style yoghurt has about half the protein and more calories.'],
+ [/5-star|extra lean.*mince/i,'<b>Extra lean (5-star) mince.</b> Regular mince has about double the calories.'],
+ [/light (feta|cheese|grated|shredded|mozzarella)|reduced[- ]fat (mozzarella|cheese)/i,'<b>Light cheese.</b> Full-fat cheese has nearly double the calories.'],
+ [/protein pasta/i,'<b>High-protein pasta</b> (e.g. Smart Pasta). Regular pasta has less than half the protein.'],
+ [/(light|lite|fat[- ]free|half[- ]fat).*mayo/i,'<b>Light mayo.</b> Regular mayo has more than double the calories.'],
+ [/sugar[- ]free.*syrup/i,'<b>Sugar-free syrup.</b> Regular maple syrup adds about 50 calories a tablespoon.'],
+ [/high[- ]protein.*milk/i,'<b>High-protein milk.</b> Regular milk has about half the protein.'],
+ [/\b(tsp|tbsp)\b.*(honey|oil|peanut butter|nut butter|maple|nutella|tahini)/i,'<b>Use a measuring spoon</b> for honey, oil and nut butters. Pouring freely can easily double them.']];
+function swapTips(lines){var s=lines.join('\n'),t=SWAPS.filter(function(x){return x[0].test(s)}).map(function(x){return '<li>'+x[1]+'</li>'});
+  return t.length?'<div class="note" style="margin-top:10px"><b>To match the numbers</b><ul style="margin:6px 0 0;padding-left:18px">'+t.join('')+'</ul></div>':''}
 /* ---------- build my own meal from ingredients (tap to add) ---------- */
 var FOOD_NAME={chicken_breast:'Chicken breast',chicken_thigh:'Chicken thigh',chicken_cooked:'Chicken, cooked (BBQ or roast)',chicken_mince:'Chicken mince',beef_strips:'Beef stir-fry strips',beef_mince:'Beef mince, lean',turkey_mince:'Turkey mince',pork_mince:'Pork mince',lamb_mince:'Lamb',ham:'Ham',deli_turkey:'Turkey slices (deli)',jerky:'Beef jerky',salmon:'Salmon fillet',smoked_salmon:'Smoked salmon',tin_salmon:'Salmon, tinned',white_fish:'White fish (basa, barramundi)',prawns:'Prawns, raw',prawns_cooked:'Prawns, cooked',tuna:'Tuna, tinned',tuna_flav:'Tuna, flavoured tin',egg:'Eggs',egg_white:'Egg whites',hp_yoghurt:'High-protein yoghurt',hp_yog_flav:'High-protein yoghurt, flavoured',greek_yog:'Greek yoghurt',cottage:'Cottage cheese',ricotta:'Ricotta',whey:'Protein powder (whey)',pea_protein:'Protein powder (plant)',tofu:'Tofu',tempeh:'Tempeh',tvp:'Soy mince (TVP)',protein_milk:'High-protein milk',protein_bar:'Protein bar',protein_pudding:'Protein pudding',roast_beef:'Roast beef slices',steak:'Steak',bacon:'Bacon',ff_cc:'Cream cheese, fat-free',plant_ham:'Plant-based ham',
 milk:'Milk',soy_milk:'Soy milk',almond_milk:'Almond milk',evap_milk:'Evaporated milk (light)',soy_yoghurt:'Soy yoghurt',herbs:'Herbs',pickles:'Pickles',salsa:'Salsa',passata:'Passata',crushed_tom:'Tomatoes, tinned',curry_paste:'Curry paste',bc_paste:'Butter chicken paste',soy:'Soy sauce',oyster:'Oyster sauce',sweet_chilli:'Sweet chilli sauce',honey:'Honey',fish_sauce:'Fish sauce',stock:'Stock',cocoa:'Cocoa powder',miso:'Miso paste',gochujang:'Gochujang',mirin:'Mirin',teriyaki:'Teriyaki sauce',hoisin:'Hoisin sauce',bbq_sauce:'BBQ or tomato sauce',coffee:'Coffee',maple:'Maple syrup',ff_mayo:'Mayo, fat-free',tom_paste:'Tomato paste',tamarind:'Tamarind',balsamic:'Balsamic vinegar',balsamic_glaze:'Balsamic glaze',sf_syrup:'Sugar-free syrup',sugar:'Sugar',applesauce:'Apple puree',white_choc:'White chocolate',vegan_choc:'Vegan chocolate',choc_biscuit:'Chocolate biscuit',kinder:'Kinder chocolate',mms:'M&Ms',vegemite:'Vegemite',cornflour:'Cornflour',jelly_lite:'Jelly, lite',sriracha:'Sriracha or hot sauce',nori:'Nori',milk_choc:'Milk chocolate',snack_bar:'Snack bar',cheese_crackers:'Cheese and crackers pack',shapes:'Shapes',light_creamy:'Light and creamy yoghurt',choc_mousse:'Chocolate mousse',icy_pole:'Icy pole',ice_cream_stick:'Ice cream on a stick',choc_bar:'Chocolate bar',popcorn:'Popcorn',fruit_nut_mix:'Fruit and nut mix',hot_choc:'Hot chocolate powder',le_snak:'Le Snak',tiny_teddies:'Tiny Teddies',muesli_bar:'Muesli bar',grain_waves:'Grain Waves',fruit_roll:'Fruit roll-up',
