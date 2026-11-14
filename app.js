@@ -211,7 +211,7 @@ function vWeek(){
 function calNote(t,T){
   var tg=+T.kcal||0;if(!tg)return '';var diff=Math.round((t.kcal-tg)/10)*10;
   if(t.kcal>tg*1.05)return '<p class="small warn" style="margin:8px 0 0">You\u2019re about '+diff+' kcal over your target today. Tap a meal to swap it or make the portion smaller.</p>';
-  if(t.n>=AS().length&&t.kcal<tg*0.85)return '<p class="small muted" style="margin:8px 0 0">You\u2019re about '+(-diff)+' kcal under your target today. That\u2019s fine on a lighter day. If you\u2019re hungry, tap a meal to make the portion bigger.</p>';
+  if(t.n>=AS().length&&t.kcal<tg*0.9)return '<p class="small muted" style="margin:8px 0 0">You\u2019re about '+(-diff)+' kcal under your target today. That\u2019s fine on a lighter day. If you\u2019re hungry, tap a meal to make the portion bigger.</p>';
   return ''}
 function portionRow(label,got,target){
   var n=Math.max(Math.ceil(target),Math.ceil(got)),d='';
