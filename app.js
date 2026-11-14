@@ -246,29 +246,70 @@ function badges(r){var b=[];if(r.viral)b.push('<span class="tag viral">Viral</sp
 var AISLES=[
  ['Frozen',/frozen|edamame/],
  ['Pantry',/tinned|canned|chickpea|black beans|lentil|stock|passata|soy sauce|oyster sauce|fish sauce|chilli sauce|curry paste|butter chicken paste|peanut butter|olive oil|sesame oil|\boil\b|oats|muesli|rice|pasta|noodle|vermicelli|cracker|cocoa|protein powder|chia|walnut|almond|peanuts|pepitas|sesame seeds|spice|seasoning|cumin|turmeric|oregano|cinnamon|garam|salsa|honey|panko|burghul|couscous|tortilla|rice paper|olives|pickles|mayonnaise|chocolate/],
- ['Meat and seafood',/chicken|beef|turkey|lamb|pork|mince|salmon|prawn|fish fillet|barramundi|basa|ham\b|jerky/],
- ['Dairy, eggs and fridge',/yoghurt|milk|egg|cheese|parmesan|feta|ricotta|mozzarella|tzatziki|tofu|hummus|coconut milk/],
- ['Bread and wraps',/bread|toast|wrap|pita|sourdough|roll/],
- ['Fruit and veg',/berr|strawberr|banana|spinach|avocado|capsicum|tomato|cucumber|lettuce|cos\b|iceberg|leaves|broccol|carrot|celery|onion|garlic|zucchini|lemon|lime|apple|mandarin|mango|potato|pumpkin|snow pea|veg|corn|herb|mint|coriander|basil|parsley|dill|ginger|kale|bok choy|sprouts|cauliflower|beans|mushroom|slaw/]];
+ ['Meat and seafood',/chicken|beef|steak|turkey|lamb|pork|mince|salmon|prawn|fish fillet|barramundi|basa|ham\b|jerky/],
+ ['Dairy, eggs and fridge',/yoghurt|milk|egg(?!plant)|cheese|parmesan|feta|ricotta|mozzarella|tzatziki|tofu|hummus|coconut milk/],
+ ['Bread and wraps',/bread|toast|wrap|pita|sourdough|bagel|roll/],
+ ['Fruit and veg',/berr|strawberr|banana|spinach|rocket|eggplant|avocado|capsicum|tomato|cucumber|lettuce|cos\b|iceberg|leaves|broccol|carrot|celery|onion|garlic|zucchini|lemon|lime|apple|mandarin|mango|potato|pumpkin|snow pea|veg|corn|herb|mint|coriander|basil|parsley|dill|ginger|kale|bok choy|sprouts|cauliflower|beans|mushroom|slaw/]];
+/* Shopping list: turn gram amounts into what you actually pick up. [grams per item or pack, singular, plural] */
+var CNT={
+ 'bananas':[120,'medium banana','medium bananas'],
+ 'apple':[150,'apple','apples'],
+ 'avocado':[140,'avocado','avocados'],
+ 'mango':[250,'mango','mangoes'],
+ 'brown onion':[150,'brown onion','brown onions'],
+ 'red onion':[150,'red onion','red onions'],
+ 'capsicum':[200,'capsicum','capsicums'],
+ 'red capsicum':[200,'capsicum','capsicums'],
+ 'carrots':[120,'carrot','carrots'],
+ 'cucumber':[100,'Lebanese cucumber','Lebanese cucumbers'],
+ 'tomatoes':[120,'tomato','tomatoes'],
+ 'cherry tomatoes':[250,'punnet cherry tomatoes (250g)','punnets cherry tomatoes (250g)'],
+ 'zucchini':[200,'zucchini','zucchini'],
+ 'eggplant':[300,'eggplant','eggplants'],
+ 'sweet potato':[300,'sweet potato','sweet potatoes'],
+ 'potatoes':[150,'potato','potatoes'],
+ 'broccoli':[350,'head broccoli','heads broccoli'],
+ 'broccolini':[190,'bunch broccolini','bunches broccolini'],
+ 'bok choy':[200,'bunch bok choy','bunches bok choy'],
+ 'celery':[600,'bunch celery','bunches celery'],
+ 'spring onion':[100,'bunch spring onions','bunches spring onions'],
+ 'iceberg or cos lettuce':[400,'lettuce (iceberg or cos)','lettuces (iceberg or cos)'],
+ 'baby spinach':[120,'bag baby spinach (120g)','bags baby spinach (120g)'],
+ 'mixed salad leaves':[120,'bag mixed salad leaves (120g)','bags mixed salad leaves (120g)'],
+ 'rocket':[120,'bag rocket (120g)','bags rocket (120g)'],
+ 'mushrooms':[200,'punnet mushrooms (200g)','punnets mushrooms (200g)'],
+ 'salmon fillets':[130,'salmon fillet','salmon fillets'],
+ 'bread (wholegrain or your choice)':[40,'slice wholegrain bread','slices wholegrain bread'],
+ 'sourdough':[50,'slice sourdough','slices sourdough'],
+ 'white pita bread':[60,'white pita','white pitas'],
+ 'tinned chickpeas':[240,'tin chickpeas (400g)','tins chickpeas (400g)'],
+ 'tinned black beans':[240,'tin black beans (400g)','tins black beans (400g)'],
+ 'tinned kidney beans':[240,'tin kidney beans (400g)','tins kidney beans (400g)'],
+ 'tinned cannellini beans':[240,'tin cannellini beans (400g)','tins cannellini beans (400g)'],
+ 'tinned brown lentils':[240,'tin brown lentils (400g)','tins brown lentils (400g)'],
+ 'tinned crushed or diced tomatoes':[400,'tin crushed or diced tomatoes (400g)','tins crushed or diced tomatoes (400g)'],
+ 'tinned tuna in springwater':[70,'tin tuna in springwater (95g)','tins tuna in springwater (95g)'],
+ 'passata':[700,'bottle passata (700g)','bottles passata (700g)']
+};
 function shopQ(it){var q=it.q,u=it.su,nm=it.name;
   if(u==='x')return nm.charAt(0).toUpperCase()+nm.slice(1);
-  if(u==='n'){var c=Math.max(1,Math.ceil(q-0.15));return c+' '+(c===1?nm.replace(/s( \(|$)/,'$1'):nm)}
+  if(u==='n'){var c=Math.max(1,Math.ceil(q-0.15));return c+' '+(c===1?(it.sing||nm.replace(/s( \(|$)/,'$1')):nm)}
   var r=q<20?Math.max(1,Math.round(q)):q<100?Math.round(q/5)*5:Math.round(q/10)*10;
   var big=r>=1000,v=big?(Math.round(r/100)/10)+(u==='ml'?'L':'kg'):r+u;return v+' '+nm}
 function aisle(item){var s=item.toLowerCase();for(var i=0;i<AISLES.length;i++)if(AISLES[i][1].test(s))return AISLES[i][0];return 'Herbs, spices and extras'}
 function shoppingList(){
   var items={},n=0,bx={};
   function add(r,m){(r.ingredients||[]).forEach(function(line,ix){var p,k,sh=r.shop&&r.shop[ix];
-      if(sh){(Array.isArray(sh[0])?sh:sh.length?[sh]:[]).forEach(function(e){k='$'+e[2]+'|'+e[0].toLowerCase();if(!items[k])items[k]={q:0,su:e[2],name:e[0],n:0};items[k].q+=e[1]*m;items[k].n++});return}
+      if(sh){(Array.isArray(sh[0])?sh:sh.length?[sh]:[]).forEach(function(e){var nm=e[0],q=e[1],u=e[2],sg=null,cv=u==='g'?CNT[nm.toLowerCase()]:null;if(cv){q=q/cv[0];u='n';sg=cv[1];nm=cv[2]}k='$'+u+'|'+nm.toLowerCase();if(!items[k])items[k]={q:0,su:u,name:nm,sing:sg,base:e[0],n:0};items[k].q+=q*m;items[k].n++});return}
       p=split(line);
       if(p){k=p.unit+'|'+p.name.toLowerCase();if(!items[k])items[k]={q:0,unit:p.unit,name:p.name,n:0};items[k].q+=p.q*m;items[k].n++}
       else{k='~'+line.toLowerCase();if(!items[k])items[k]={text:line,n:0,check:true};items[k].n++}})}
   DAYS.forEach(function(d){AS().forEach(function(s){var e=ent(d,s[0]);if(!e)return;n++;
     if(e.r.batch){if(!bx[e.r.id])bx[e.r.id]={r:e.r,x:0};bx[e.r.id].x+=e.x}else add(e.r,e.x)})});
   Object.keys(bx).forEach(function(id){add(bx[id].r,batches(bx[id].r,bx[id].x))});
-  var named={};Object.keys(items).forEach(function(k){var it=items[k];if(it.su&&it.su!=='x')named[it.name.toLowerCase()]=1});
+  var named={};Object.keys(items).forEach(function(k){var it=items[k];if(it.su&&it.su!=='x')named[(it.base||it.name).toLowerCase()]=1});
   Object.keys(items).forEach(function(k){if(items[k].su==='x'&&named[items[k].name.toLowerCase()])delete items[k]});
-  var groups={};Object.keys(items).forEach(function(k){var it=items[k];it.key=k;it.label=it.su?shopQ(it):(it.text||fmtQ(it.q,it.unit,it.name));var a=it.check?'Check you have':aisle(it.text||it.name);(groups[a]=groups[a]||[]).push(it)});
+  var groups={};Object.keys(items).forEach(function(k){var it=items[k];it.key=k;it.label=it.su?shopQ(it):(it.text||fmtQ(it.q,it.unit,it.name));var a=it.check?'Check you have':aisle(it.text||it.base||it.name);(groups[a]=groups[a]||[]).push(it)});
   Object.keys(groups).forEach(function(a){groups[a].sort(function(x,y){return x.label.toLowerCase().replace(/^[\d.¼-¾ ]+(g|ml|kg|tsp|tbsp)?\s*/,'').localeCompare(y.label.toLowerCase().replace(/^[\d.¼-¾ ]+(g|ml|kg|tsp|tbsp)?\s*/,''))})});
   return {groups:groups,meals:n}}
 var ORDER=['Fruit and veg','Meat and seafood','Dairy, eggs and fridge','Bread and wraps','Pantry','Frozen','Herbs, spices and extras','Check you have'];
