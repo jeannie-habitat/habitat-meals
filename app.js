@@ -531,18 +531,18 @@ function mineHtml(){
   '<label>Meal<select id="m-meal">'+MEALS.slice(1).map(function(m){return '<option value="'+m[0]+'"'+(v.meal===m[0]?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select></label>'+
   '<label class="check"><input type="checkbox" id="m-rm"'+(v.readymade?' checked':'')+'> Ready-made meal I buy or order</label>'+
   '<label>Brand or shop <span class="hint">Optional, e.g. My Fitness Kitchn</span><input type="text" id="m-brand" maxlength="40" value="'+esc(v.brand||'')+'"></label>'+
-  '<div class="pair"><label>Calories (kcal)<input type="number" id="m-kcal" inputmode="numeric" min="1" required value="'+kc+'"></label><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" required value="'+v.protein+'"></label></div>'+
-  '<details class="more"'+(r&&!r.noCF?' open':'')+'><summary>Carbs and fat (optional)</summary><div class="pair"><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" value="'+(r&&!r.noCF?v.carbs:'')+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" value="'+(r&&!r.noCF?v.fat:'')+'"></label></div></details>'+
+  '<div class="pair"><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" required value="'+v.protein+'"></label><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.carbs)+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.fat)+'"></label></div>'+
+  '<p class="small muted" id="m-kcal" style="margin:-6px 0 0">'+(r&&!r.noCF?'That works out to about '+kc+' calories.':'Use the amounts for one serve from the label or menu. Calories work out automatically. Put 0 if there is none.')+'</p>'+
   '<details class="more"'+((v.ingredients||[]).length?' open':'')+'><summary>Ingredients for my shopping list (optional)</summary><label>One per line, starting with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs. Skip this for ready-made meals.</span><textarea id="m-ing">'+esc((v.ingredients||[]).join('\n'))+'</textarea></label></details>'+
   (r?'':'<label class="check"><input type="checkbox" id="m-fav" checked> Add to my go-tos ★</label>')+
   '<div class="row"><button class="btn primary" type="submit">'+(r?'Save changes':(sh.slot?'Save and add to '+DAYS[UI.day]:'Save'))+'</button></div><p class="status" id="m-status" role="status"></p></form>'}
 function saveMine(){
-  var st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),kc=Math.round(val('m-kcal')),p=val('m-p'),c=val('m-c'),f=val('m-f'),rm=DOC.getElementById('m-rm').checked;
+  var st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),p=val('m-p'),c=val('m-c'),f=val('m-f'),rm=DOC.getElementById('m-rm').checked,kc=kcal({protein:p,carbs:c,fat:f});
   if(!name){st.textContent='Add a name first.';return}
-  if(!(kc>0)){st.textContent='Add the calories for one serve.';return}
-  if(4*p>kc*1.15){st.textContent='That protein is more than the calories can hold. Check both numbers on the label.';return}
+  if(['m-p','m-c','m-f'].some(function(id){return DOC.getElementById(id).value===''})){st.textContent='Add the protein, carbs and fat for one serve. Put 0 if there is none.';return}
+  if(!(kc>0)){st.textContent='Those amounts add up to zero calories. Check the numbers on the label.';return}
   var ing=rm?[]:DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),old=UI.sheet.id?byId(UI.sheet.id):null;
-  var rec={id:old?old.id:('c'+Date.now().toString(36)),custom:true,fixed:true,name:name,meal:DOC.getElementById('m-meal').value,mins:0,protein:p,carbs:c,fat:f,kcalFix:kc,noCF:!(c||f),
+  var rec={id:old?old.id:('c'+Date.now().toString(36)),custom:true,fixed:true,name:name,meal:DOC.getElementById('m-meal').value,mins:0,protein:p,carbs:c,fat:f,
     hp:p/24,hv:0,hc:c/25,hf:f/10,tags:[],ingredients:ing,steps:[],style:rm?'grab':'assemble',keeps:7,freezes:false,readymade:rm,brand:DOC.getElementById('m-brand').value.trim()};
   if(old){S.custom=S.custom.map(function(x){return x.id===old.id?rec:x})}else{S.custom.push(rec);var fv=DOC.getElementById('m-fav');if(fv&&fv.checked)S.favs.push(rec.id)}
   var slot=UI.sheet.slot;if(slot){setEnt(DAYS[UI.day],slot,rec.id,1);S.examplePlan=false}
@@ -647,6 +647,7 @@ root.addEventListener('input',function(e){
   if(t.id==='imp-link'){UI.imp.link=t.value.trim();return}
   if(t.id==='q'){UI.q=t.value;var list=filtered(UI.meal,UI.q);DOC.getElementById('cards').innerHTML=cards(list);DOC.getElementById('count').textContent=list.length+' recipe'+(list.length===1?'':'s')+' \u00b7 calories shown for your portion'}
   else if(t.id==='pq'){UI.sheet.q=t.value;var tmp=document.createElement('div');tmp.innerHTML=pickHtml();DOC.getElementById('picklist').innerHTML=tmp.querySelector('#picklist').innerHTML}
+  else if(t.id==='m-p'||t.id==='m-c'||t.id==='m-f'){var mk=kcal({protein:val('m-p'),carbs:val('m-c'),fat:val('m-f')});DOC.getElementById('m-kcal').textContent=mk?'That works out to about '+mk+' calories.':'Use the amounts for one serve from the label or menu. Calories work out automatically. Put 0 if there is none.'}
   else if(t.id==='e-p'||t.id==='e-c'||t.id==='e-f'){var k=kcal({protein:val('e-p'),carbs:val('e-c'),fat:val('e-f')});DOC.getElementById('e-kcal').textContent='That works out to about '+k+' calories per standard serve.'}});
 root.addEventListener('submit',function(e){
   e.preventDefault();
