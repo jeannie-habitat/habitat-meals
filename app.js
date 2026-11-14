@@ -125,6 +125,7 @@ function render(){
   var old=root.querySelector('.sheet'),top=old?old.scrollTop:0,same=old&&UI.sheet&&old.dataset.k===sheetKey();
   root.innerHTML=h;
   var nw=root.querySelector('.sheet');if(nw){nw.dataset.k=sheetKey();if(same)nw.scrollTop=top}
+  if(UI.sheet&&UI.sheet.type==='mine')mineSum();
 }
 function sheetKey(){var s=UI.sheet;return s?s.type+'|'+(s.id||'')+'|'+(s.slot||''):''}
 function sizer(act,x,extra){return '<span class="sizer" role="group" aria-label="Portion size"><button data-act="'+act+'" data-dir="-1" '+extra+' aria-label="Smaller portion"'+(x<=SIZES[0]?' disabled':'')+'>−</button><span>×'+frac(x)+'</span><button data-act="'+act+'" data-dir="1" '+extra+' aria-label="Bigger portion"'+(x>=SIZES[SIZES.length-1]?' disabled':'')+'>+</button></span>'}
@@ -492,6 +493,7 @@ function detailHtml(r){
       '<div class="sizebar"><span>Days<br><span class="small muted">'+(n>1?'Cook once, eat it '+n+' days':'Just once')+'</span></span><span class="sizer" role="group" aria-label="Number of days"><button data-act="serves" data-dir="-1" aria-label="Fewer days"'+(n<=1?' disabled':'')+'>−</button><span>'+n+'</span><button data-act="serves" data-dir="1" aria-label="More days"'+(n>=7?' disabled':'')+'>+</button></span></div>'+
       prepWarn(r,n)+'<div class="row"><button class="btn primary" data-act="add" data-id="'+r.id+'">'+(n>1?'Add '+n+' days':'Add to my week')+'</button>'+favBtn+'</div></div>'}
   if((r.tags||[]).length)h+='<div class="tags" style="margin-bottom:12px">'+r.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')+'</div>';
+  if(r.custom&&r.est)h+='<p class="small muted">Numbers estimated from the ingredients'+(r.serves>1?', per serve (makes '+r.serves+')':'')+'.</p>';
   if(r.custom&&!(r.ingredients||[]).length)h+='<p class="small muted">'+(r.readymade?'Ready-made. It shows under “Ready-made meals” on your shopping list.':'No ingredients saved, so this isn’t on your shopping list. Tap Edit to add some.')+'</p>';
   else if(r.batch)h+='<h3>Ingredients <span class="small muted" style="font-weight:400">whole batch, makes '+r.batch+' serves</span></h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul><p class="note">Your portion is '+(x===1?'1 serve':frac(x)+' serves')+' of the '+r.batch+'. The kcal and macros above are for your portion.</p>';
   else h+='<h3>Ingredients'+(x!==1?' <span class="small muted" style="font-weight:400">for your portion (×'+frac(x)+')</span>':'')+'</h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(scaleLine(i,x))+'</li>'}).join('')+'</ul>';
@@ -519,23 +521,6 @@ function pickHtml(){
   if(favs.length)h+='<h3 style="margin-bottom:8px">★ My go-tos</h3>'+favs.map(row).join('')+'<h3 style="margin:16px 0 8px">Everything else</h3>';
   h+=rest.length?rest.map(row).join(''):(favs.length?'':'<div class="empty"><p>No meals match.</p><div class="row"><button class="btn small" data-act="clear-search">Clear search</button><button class="btn small ghost" data-act="clear-filters">Reset filters</button></div></div>');
   return h+'</div>'}
-function mineHtml(){
-  var sh=UI.sheet,r=sh.id?byId(sh.id):null,sl=sh.slot?slotMeal(sh.slot):(UI.meal!=='all'?UI.meal:'snack');
-  if(sl==='snack-or-dessert')sl='snack';
-  var v=r||{name:'',meal:sl,protein:'',carbs:'',fat:'',ingredients:[],readymade:false,brand:''};
-  var kc=r?kcal(r):'';
-  return head(r?'Edit my meal':'Add my own meal or snack','Saved on this phone')+
-  '<p class="small muted" style="margin-top:0">Add something you eat a lot. It counts in your daily calories and you can add it to your week like any other meal. It stays as one fixed serve.</p>'+
-  '<form class="form" id="mine-form">'+
-  '<label>Name<input type="text" id="m-name" required maxlength="60" placeholder="e.g. My usual protein shake" value="'+esc(v.name)+'"></label>'+
-  '<label>Meal<select id="m-meal">'+MEALS.slice(1).map(function(m){return '<option value="'+m[0]+'"'+(v.meal===m[0]?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select></label>'+
-  '<label class="check"><input type="checkbox" id="m-rm"'+(v.readymade?' checked':'')+'> Ready-made meal I buy or order</label>'+
-  '<label>Brand or shop <span class="hint">Optional, e.g. My Fitness Kitchn</span><input type="text" id="m-brand" maxlength="40" value="'+esc(v.brand||'')+'"></label>'+
-  (v.readymade?'':'')+'<details class="more" id="m-ingbox" open><summary>Ingredients (I only know the ingredients)</summary><label>One per line, starting with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs. They also go on your shopping list. Skip for ready-made meals.</span><textarea id="m-ing">'+esc((v.ingredients||[]).join('\n'))+'</textarea></label><div class="row"><button class="btn small" type="button" data-act="estmine">Work out protein, carbs and fat</button></div><p class="small muted" id="m-est" role="status" style="margin:6px 0 0"></p></details>'+
-  '<div class="pair"><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" required value="'+v.protein+'"></label><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.carbs)+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.fat)+'"></label></div>'+
-  '<p class="small muted" id="m-kcal" style="margin:-6px 0 0">'+(r&&!r.noCF?'That works out to about '+kc+' calories.':'Use the amounts for one serve from the label or menu. Calories work out automatically. Put 0 if there is none.')+'</p>'+
-  (r?'':'<label class="check"><input type="checkbox" id="m-fav" checked> Add to my go-tos ★</label>')+
-  '<div class="row"><button class="btn primary" type="submit">'+(r?'Save changes':(sh.slot?'Save and add to '+DAYS[UI.day]:'Save'))+'</button></div><p class="status" id="m-status" role="status"></p></form>'}
 /* ---------- estimate macros from ingredients ---------- */
 // Ingredient-based macro estimate (prototype; will be embedded in app.js)
 var EST_IGN=/^(?:(?:an? |a few |a pinch of |a pinch |a splash of |a dash of |a drizzle of |a squeeze of |a sprinkle of |a handful of |a few sprays of |\d+ sprays? of |a \d+-second spray of |\d+ ?(?:small |large )?cloves? |ground |dried |fresh |kosher |heaped )*)(?:clove garlic|cloves garlic|garlic cloves?|garlic|olive oil spray|oil spray|cooking spray|salt|ice|water|espresso|shot espresso|coffee|sea salt|pepper|black pepper|white pepper|cracked pepper|garlic|chilli|chili|chilli flakes|lemon|lime|vinegar|[a-z ]*vinegar|spices?|seasoning|cumin|paprika|smoked paprika|turmeric|cinnamon|oregano|thyme|rosemary|herbs?|fresh herbs|basil|coriander|parsley|mint|dill|chives|ginger|stevia|baking powder|bicarb[a-z ]*|vanilla|vanilla extract|water|ice|mustard|dijon mustard|tabasco|lemongrass|star anise|garam masala|curry powder|msg|spring onion|spring onions|lemon juice|lime juice|nutmeg|cardamom|chinese five spice|italian seasoning|taco seasoning|shawarma spice|everything bagel seasoning|garlic powder|onion powder|cayenne|fresh chilli|fresh ginger|fresh coriander|fresh mint|fresh basil|fresh parsley|fresh dill|fresh chives|fresh thai basil)\b/;
@@ -603,22 +588,143 @@ function estimate(lines){var NUT=__NUT;
   return {p:P,c:C,f:F,ok:ok,bad:bad}}
 
 
-function estMine(){
-  var box=DOC.getElementById('m-est'),txt=DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
-  if(!txt.length){box.textContent='Add your ingredients first, one per line, starting with the amount.';return}
-  var r=estimate(txt),n=r.ok.filter(function(x){return x[1]!==0}).length;
-  if(!n){box.textContent='I could not match any of those. Check the amounts, or type the protein, carbs and fat yourself.';return}
-  DOC.getElementById('m-p').value=Math.round(r.p);DOC.getElementById('m-c').value=Math.round(r.c);DOC.getElementById('m-f').value=Math.round(r.f);
-  var mk=kcal({protein:val('m-p'),carbs:val('m-c'),fat:val('m-f')});DOC.getElementById('m-kcal').textContent='That works out to about '+mk+' calories.';
-  box.innerHTML='Estimated for the whole recipe as one serve, assuming raw weights unless you write cooked. Check the numbers above and change them if you know better.'+(r.bad.length?'<br><b>Not counted, so add these by hand:</b> '+r.bad.map(esc).join('; '):'')}
+/* ---------- build my own meal from ingredients (tap to add) ---------- */
+var FOOD_NAME={chicken_breast:'Chicken breast',chicken_thigh:'Chicken thigh',chicken_cooked:'Chicken, cooked (BBQ or roast)',chicken_mince:'Chicken mince',beef_strips:'Beef stir-fry strips',beef_mince:'Beef mince, lean',turkey_mince:'Turkey mince',pork_mince:'Pork mince',lamb_mince:'Lamb',ham:'Ham',deli_turkey:'Turkey slices (deli)',jerky:'Beef jerky',salmon:'Salmon fillet',smoked_salmon:'Smoked salmon',tin_salmon:'Salmon, tinned',white_fish:'White fish (basa, barramundi)',prawns:'Prawns, raw',prawns_cooked:'Prawns, cooked',tuna:'Tuna, tinned',tuna_flav:'Tuna, flavoured tin',egg:'Eggs',egg_white:'Egg whites',hp_yoghurt:'High-protein yoghurt',hp_yog_flav:'High-protein yoghurt, flavoured',greek_yog:'Greek yoghurt',cottage:'Cottage cheese',ricotta:'Ricotta',whey:'Protein powder (whey)',pea_protein:'Protein powder (plant)',tofu:'Tofu',tempeh:'Tempeh',tvp:'Soy mince (TVP)',protein_milk:'High-protein milk',protein_bar:'Protein bar',protein_pudding:'Protein pudding',roast_beef:'Roast beef slices',steak:'Steak',bacon:'Bacon',ff_cc:'Cream cheese, fat-free',plant_ham:'Plant-based ham',
+milk:'Milk',soy_milk:'Soy milk',almond_milk:'Almond milk',evap_milk:'Evaporated milk (light)',soy_yoghurt:'Soy yoghurt',herbs:'Herbs',pickles:'Pickles',salsa:'Salsa',passata:'Passata',crushed_tom:'Tomatoes, tinned',curry_paste:'Curry paste',bc_paste:'Butter chicken paste',soy:'Soy sauce',oyster:'Oyster sauce',sweet_chilli:'Sweet chilli sauce',honey:'Honey',fish_sauce:'Fish sauce',stock:'Stock',cocoa:'Cocoa powder',miso:'Miso paste',gochujang:'Gochujang',mirin:'Mirin',teriyaki:'Teriyaki sauce',hoisin:'Hoisin sauce',bbq_sauce:'BBQ or tomato sauce',coffee:'Coffee',maple:'Maple syrup',ff_mayo:'Mayo, fat-free',tom_paste:'Tomato paste',tamarind:'Tamarind',balsamic:'Balsamic vinegar',balsamic_glaze:'Balsamic glaze',sf_syrup:'Sugar-free syrup',sugar:'Sugar',applesauce:'Apple puree',white_choc:'White chocolate',vegan_choc:'Vegan chocolate',choc_biscuit:'Chocolate biscuit',kinder:'Kinder chocolate',mms:'M&Ms',vegemite:'Vegemite',cornflour:'Cornflour',jelly_lite:'Jelly, lite',sriracha:'Sriracha or hot sauce',nori:'Nori',milk_choc:'Milk chocolate',snack_bar:'Snack bar',cheese_crackers:'Cheese and crackers pack',shapes:'Shapes',light_creamy:'Light and creamy yoghurt',choc_mousse:'Chocolate mousse',icy_pole:'Icy pole',ice_cream_stick:'Ice cream on a stick',choc_bar:'Chocolate bar',popcorn:'Popcorn',fruit_nut_mix:'Fruit and nut mix',hot_choc:'Hot chocolate powder',le_snak:'Le Snak',tiny_teddies:'Tiny Teddies',muesli_bar:'Muesli bar',grain_waves:'Grain Waves',fruit_roll:'Fruit roll-up',
+feta:'Feta, light',parmesan:'Parmesan',light_cheese:'Cheese, light (grated or sliced)',cheddar:'Cheese, tasty',tzatziki:'Tzatziki',olives:'Olives',avocado:'Avocado',olive_oil:'Olive oil',sesame_oil:'Sesame oil',pb:'Peanut butter',chia:'Chia seeds',walnuts:'Walnuts',almonds:'Almonds',peanuts:'Peanuts',pepitas:'Pepitas',sesame:'Sesame seeds',hummus:'Hummus',light_mayo:'Mayo, light',mayo:'Mayo',hf_mayo:'Mayo, half-fat',coconut_light:'Coconut milk, light',dark_choc:'Dark chocolate',cashews:'Cashews',burrata:'Burrata',butter:'Butter',chilli_crisp:'Chilli crisp',pesto:'Pesto',tahini:'Tahini',cream_cheese:'Cream cheese',light_cc:'Cream cheese, light',mozzarella:'Mozzarella',light_cream:'Cream, light',oat_cream:'Oat cream',marg:'Margarine',coconut:'Coconut, desiccated',flax:'Flaxseed',seeds:'Mixed seeds',nutella:'Nutella',ranch:'Ranch dressing',babybel:'Babybel',stringers:'Cheese sticks',
+edamame:'Edamame',red_lentils:'Red lentils, dry',lentils_tin:'Lentils, tinned',chickpeas:'Chickpeas, tinned',black_beans:'Black beans, tinned',cannellini:'Cannellini beans, tinned',kidney_beans:'Kidney beans, tinned',fava_beans:'Fava beans',
+oats:'Oats',muesli:'Muesli',brown_rice:'Brown rice, cooked',wm_pasta:'Pasta, wholemeal',potato:'Potato',sweet_potato:'Sweet potato',wrap:'Wrap',bread:'Bread',sourdough:'Sourdough',pita:'Pita bread',corn_tortilla:'Corn tortilla',rice_paper:'Rice paper',rice_cakes:'Rice cakes',crackers:'Crackers',panko:'Breadcrumbs',corn:'Corn',banana:'Banana',berries:'Berries',apple:'Apple',mandarin:'Mandarin or orange',mango:'Mango',soba:'Soba noodles',pasta:'Pasta',creamed_corn:'Creamed corn',dumplings:'Dumplings',biscuit:'Plain biscuit',savoiardi:'Savoiardi biscuits',roll:'Bread roll',dates:'Dates',flour:'Flour',quinoa_dry:'Quinoa',gf_oats:'Oats, gluten-free',weetbix:'Weet-Bix',bagel:'Bagel',croissant:'Croissant',thins:'Sandwich thins',taco_shell:'Taco shells',corn_chips:'Corn chips',rice_dry:'Rice',couscous_dry:'Couscous',egg_noodles:'Egg noodles',rice_noodles:'Rice noodles',gnocchi:'Gnocchi',fresh_pasta:'Pasta, fresh',pulse_pasta:'Pasta, legume',protein_pasta:'Pasta, high-protein',tortellini:'Tortellini or ravioli',rice_bubbles:'Rice Bubbles',granola:'Granola',cherries:'Cherries',peach:'Peach',kiwi:'Kiwi fruit',cruskits:'Cruskits',rice_crackers:'Rice crackers',thin_rice_cake:'Rice cakes, thin',protein_granola:'Protein granola',protein_cereal:'Protein cereal',
+pumpkin:'Pumpkin',broccoli:'Broccoli',spinach:'Spinach',capsicum:'Capsicum',tomato:'Tomato',cucumber:'Cucumber',lettuce:'Lettuce or salad leaves',zucchini:'Zucchini',mushroom:'Mushrooms',carrot:'Carrot',onion:'Onion',cauliflower:'Cauliflower',green_beans:'Green beans',mixed_veg:'Mixed veg (frozen)',asian_veg:'Stir-fry veg mix',slaw:'Coleslaw mix or cabbage',snow_peas:'Snow peas',celery:'Celery',bok_choy:'Bok choy',sprouts:'Sprouts',tabouli:'Tabouli',kimchi:'Kimchi',watercress:'Watercress',sundried:'Sun-dried tomatoes',artichoke:'Artichokes',eggplant:'Eggplant'};
+/* cooked versions that are covered by a raw/cooked switch on the raw item */
+var FOOD_POP=' chicken_breast rice_dry egg banana oats beef_mince salmon pasta potato sweet_potato broccoli avocado olive_oil greek_yog hp_yoghurt milk bread wrap tuna whey apple berries spinach cheddar pb ';
+var FOOD_HIDE={white_rice:1,quinoa:1,couscous:1,herbs:1,coffee:1,dumpling:1};
+var RAW_MEAT=/^(chicken_breast|chicken_thigh|chicken_mince|beef_strips|beef_mince|turkey_mince|pork_mince|lamb_mince|salmon|white_fish|prawns|steak)$/;
+var DRY_GRAIN=/^(rice_dry|quinoa_dry|couscous_dry|pasta|wm_pasta|pulse_pasta|protein_pasta|egg_noodles|soba|rice_noodles|red_lentils)$/;
+var SNACKS=/^(white_choc|vegan_choc|choc_biscuit|kinder|mms|milk_choc|snack_bar|cheese_crackers|shapes|light_creamy|choc_mousse|icy_pole|ice_cream_stick|choc_bar|popcorn|fruit_nut_mix|le_snak|tiny_teddies|muesli_bar|grain_waves|fruit_roll|jelly_lite|protein_bar|protein_pudding|dark_choc|biscuit)$/;
+function foodName(k){return FOOD_NAME[k]||(k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g,' '))}
+/* portion choices: [label, grams in the food table's own basis] */
+function portions(k){
+  var g=(__NUT[k]||[])[3],pc=EST_PC[k],P=[];
+  if(RAW_MEAT.test(k))return [['1 palm',130],['1½ palms',195],['2 palms',260]];
+  if(/^(chicken_cooked|prawns_cooked|roast_beef|tofu|tempeh|smoked_salmon|tin_salmon|plant_ham)$/.test(k))return [['1 palm',100],['1½ palms',150],['2 palms',200]];
+  if(k==='egg')return [['1 egg',50],['2 eggs',100],['3 eggs',150]];
+  if(k==='egg_white')return [['2 egg whites',66],['½ cup',120],['1 cup',240]];
+  if(k==='tuna'||k==='tuna_flav')return [['1 small tin',95],['1 big tin',185]];
+  if(k==='whey'||k==='pea_protein')return [['1 scoop',30],['2 scoops',60]];
+  if(/^(ham|deli_turkey)$/.test(k))return [['2 slices',30],['4 slices',60]];
+  if(/^(hp_yoghurt|hp_yog_flav|greek_yog|soy_yoghurt|cottage|ricotta|light_creamy)$/.test(k))return [['½ cup',125],['1 tub (170g)',170],['1 cup',245]];
+  if(/milk$/.test(k)&&k!=='evap_milk'&&k!=='coconut_light')return [['½ cup',125],['1 cup',250],['1 big glass',350]];
+  if(k==='oats'||k==='gf_oats'||k==='muesli'||k==='granola'||k==='protein_granola'||k==='protein_cereal')return [['¼ cup',23],['½ cup',45],['1 cup',90]];
+  if(k==='weetbix')return [['2 biscuits',33],['3 biscuits',50]];
+  if(k==='rice_dry')return [['1 cupped hand cooked',40],['1 microwave pouch',100],['1 cup cooked',65]];
+  if(DRY_GRAIN.test(k))return [['1 cupped hand cooked',40],['2 cupped hands cooked',80]];
+  if(/^(brown_rice|gnocchi|fresh_pasta|tortellini|creamed_corn|corn)$/.test(k))return [['1 cupped hand',100],['2 cupped hands',200]];
+  if(/^(potato|sweet_potato|pumpkin)$/.test(k))return [['1 cupped hand',100],['1 small',150],['1 medium',k==='sweet_potato'?250:200]];
+  if(k==='avocado')return [['¼ avocado',38],['½ avocado',75],['1 avocado',150]];
+  if(/^(olive_oil|sesame_oil|butter|marg)$/.test(k))return [['1 tsp',5],['1 tbsp',14],['2 tbsp',28]];
+  if(/^(pb|nutella|tahini|hummus|pesto|mayo|light_mayo|hf_mayo|ff_mayo|cream_cheese|light_cc|ff_cc|tzatziki|ranch|chilli_crisp|honey|maple)$/.test(k))return [['1 tsp',7],['1 thumb (1 tbsp)',20],['2 tbsp',40]];
+  if(/^(almonds|walnuts|peanuts|cashews|pepitas|fruit_nut_mix|seeds)$/.test(k))return [['Small handful',30],['Big handful',50]];
+  if(/^(chia|flax|sesame|coconut)$/.test(k))return [['1 tsp',5],['1 tbsp',12]];
+  if(/^(cheddar|light_cheese|mozzarella)$/.test(k))return [['1 slice',20],['¼ cup grated',28],['½ cup grated',55]];
+  if(/^(feta|parmesan|burrata)$/.test(k))return [['1 thumb',15],['2 thumbs',30],['¼ cup',40]];
+  if(g==='L')return [['½ cup',90],['1 cup',180],['½ tin',125]];
+  if(g==='V'){if(pc)P.push(['½',Math.round(pc/2)],['1',pc]);return P.concat([['1 fist',EST_CUP[k]||80],['2 fists',2*(EST_CUP[k]||80)]])}
+  if(SNACKS.test(k))return [['1 small',25],['1 regular',40]];
+  if(/^(bread|sourdough)$/.test(k))return [['1 slice',pc||40],['2 slices',2*(pc||40)]];
+  if(pc&&g==='C')return [['1 small',Math.round(pc*0.75)],['1',pc],['2',2*pc]];
+  if(pc)return [['1',pc],['2',2*pc]];
+  return [['1 tsp',5],['1 tbsp',15],['2 tbsp',30]]}
+function cookable(k){return RAW_MEAT.test(k)||DRY_GRAIN.test(k)}
+function itemGrams(it){if(it.c!=null&&it.c>=0){var p=portions(it.k)[it.c];if(p)return p[1]}var g=+it.g||0;if(it.cooked&&cookable(it.k))g=RAW_MEAT.test(it.k)?g/0.75:g*0.4;return g}
+function foodSearch(q){
+  q=q.toLowerCase().trim();if(q.length<2)return [];
+  var words=q.split(/\s+/),out=[],seen={};
+  Object.keys(__NUT).forEach(function(k){if(FOOD_HIDE[k])return;var n=foodName(k).toLowerCase(),kk=k.replace(/_/g,' ');if(words.every(function(w){return n.indexOf(w)>=0||kk.indexOf(w)>=0})){out.push([(n.indexOf(q)===0?0:2)-(FOOD_POP.indexOf(' '+k+' ')>=0?1:0),n.length,k]);seen[k]=1}});
+  for(var i=0;i<EST_RULES.length;i++)if(EST_RULES[i][0].test(q)){var k=EST_RULES[i][1];if(k==='white_rice')k='rice_dry';if(__NUT[k]&&!seen[k]&&!FOOD_HIDE[k])out.push([3,0,k]);break}
+  out.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]});return out.slice(0,8).map(function(x){return x[2]})}
+function mineInit(sh){
+  if(sh.mi)return sh.mi;var r=sh.id?byId(sh.id):null,mi={mode:null,items:[],serves:1,manual:false};
+  if(r){if(r.items){mi.mode='build';mi.items=r.items.map(function(x){return {k:x.k,c:x.c,g:x.g,cooked:x.cooked}});mi.serves=r.serves||1;mi.manual=!r.est}
+    else if((r.ingredients||[]).length){mi.mode='build';mi.items=estimate(r.ingredients).ok.filter(function(x){return x[2]}).map(function(x){return {k:x[2],c:-1,g:x[1]}});mi.manual=true}
+    else mi.mode='label'}
+  return sh.mi=mi}
+function itemsHtml(mi){
+  if(!mi.items.length)return '<p class="small muted" style="margin:4px 0">Nothing added yet. Search above, then tap the food.</p>';
+  return mi.items.map(function(it,i){var ps=portions(it.k),custom=!(it.c>=0);
+    return '<div class="m-item" style="border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:var(--surface)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>'+esc(foodName(it.k))+'</b><button type="button" class="btn small ghost" data-act="m-del" data-i="'+i+'" aria-label="Remove '+esc(foodName(it.k))+'">Remove</button></div>'+
+    '<div class="chips" style="margin-top:6px">'+ps.map(function(p,j){return '<button type="button" class="chip" data-act="m-chip" data-i="'+i+'" data-c="'+j+'" aria-pressed="'+(it.c===j)+'">'+esc(p[0])+'</button>'}).join('')+'<button type="button" class="chip" data-act="m-chip" data-i="'+i+'" data-c="-1" aria-pressed="'+custom+'">Grams</button></div>'+
+    (custom?'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><input type="number" class="m-g" data-i="'+i+'" inputmode="decimal" min="0" value="'+(it.g||'')+'" placeholder="grams" style="width:110px" aria-label="Grams of '+esc(foodName(it.k))+'"> g'+
+      (cookable(it.k)?'<span class="chips"><button type="button" class="chip" data-act="m-cook" data-i="'+i+'" data-v="0" aria-pressed="'+!it.cooked+'">Weighed raw</button><button type="button" class="chip" data-act="m-cook" data-i="'+i+'" data-v="1" aria-pressed="'+!!it.cooked+'">Weighed cooked</button></span>':'')+'</div>':'')+
+    '</div>'}).join('')}
+function mineCalc(){
+  var mi=UI.sheet.mi,P=0,C=0,F=0,n=mi.serves||1;
+  mi.items.forEach(function(it){var t=__NUT[it.k];if(!t)return;var g=itemGrams(it);P+=t[0]*g/100;C+=t[1]*g/100;F+=t[2]*g/100});
+  return {p:Math.round(P/n),c:Math.round(C/n),f:Math.round(F/n)}}
+function mineSum(){
+  var mi=UI.sheet&&UI.sheet.mi;if(!mi||!DOC.getElementById('m-p'))return;var box=DOC.getElementById('m-sum');
+  if(mi.mode==='build'&&!mi.manual){var m=mineCalc();DOC.getElementById('m-p').value=mi.items.length?m.p:'';DOC.getElementById('m-c').value=mi.items.length?m.c:'';DOC.getElementById('m-f').value=mi.items.length?m.f:''}
+  var p=val('m-p'),c=val('m-c'),f=val('m-f'),k=kcal({protein:p,carbs:c,fat:f}),mk=DOC.getElementById('m-kcal');
+  if(mk)mk.textContent=k?'That works out to about '+k+' calories.':'Calories work out automatically. Put 0 if there is none.';
+  if(!box)return;
+  if(!mi.items.length&&!k){box.innerHTML='';return}
+  var meal=DOC.getElementById('m-meal').value,big=(mi.serves||1)===1&&k>(/snack|dessert/.test(meal)?600:1000);
+  box.innerHTML='<div class="note" style="margin:10px 0"><b style="font-size:17px">About '+k+' calories'+((mi.serves||1)>1?' per serve':'')+'</b><br>'+Math.round(p)+'g protein · '+Math.round(c)+'g carbs · '+Math.round(f)+'g fat'+
+    '<br><span class="small">'+(mi.manual?'You changed these numbers yourself.':'An estimate from Habitat’s food table. Close enough is fine.')+'</span></div>'+
+    (big?'<p class="small" style="color:var(--warn);margin:0 0 8px"><b>That’s a lot for one serve.</b> If this makes more than one, set how many serves it makes below.</p>':'')}
+function mineRefresh(){var mi=UI.sheet.mi,el=DOC.getElementById('m-items');if(el)el.innerHTML=itemsHtml(mi);var s=DOC.getElementById('m-serves-n');if(s)s.textContent=mi.serves;mineSum()}
+function mineKeep(){var sh=UI.sheet,d=sh.draft||{};['m-name','m-meal','m-brand'].forEach(function(id){var e=DOC.getElementById(id);if(e)d[id]=e.value});['m-rm','m-fav'].forEach(function(id){var e=DOC.getElementById(id);if(e)d[id]=e.checked});['m-p','m-c','m-f'].forEach(function(id){var e=DOC.getElementById(id);if(e)d[id]=e.value});sh.draft=d}
+function minePaste(){
+  var mi=UI.sheet.mi,box=DOC.getElementById('m-est'),txt=DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  if(!txt.length){box.textContent='Type or paste your list first, one ingredient per line.';return}
+  var r=estimate(txt),add=r.ok.filter(function(x){return x[2]&&__NUT[x[2]]});
+  add.forEach(function(x){var k=x[2]==='white_rice'?'rice_dry':x[2],g=x[2]==='white_rice'?Math.round(x[1]*0.4):x[1];mi.items.push({k:k,c:-1,g:g})});
+  mi.manual=false;DOC.getElementById('m-ing').value=r.bad.join('\n');
+  box.innerHTML=(add.length?'Added '+add.length+' to your list above. Check the amounts.':'I couldn’t match those.')+(r.bad.length?'<br><b>Still to add:</b> search for these above and pick the closest match. They’re left in the box.':'');
+  mineRefresh()}
+
+function mineHtml(){
+  var sh=UI.sheet,r=sh.id?byId(sh.id):null,sl=sh.slot?slotMeal(sh.slot):(UI.meal!=='all'?UI.meal:'snack');
+  if(sl==='snack-or-dessert')sl='snack';
+  var v=r||{name:'',meal:sl,protein:'',carbs:'',fat:'',ingredients:[],readymade:false,brand:''},mi=mineInit(sh),d=sh.draft||{};
+  function dv(id,x){return d[id]!=null?d[id]:x}
+  var nm=dv('m-name',v.name),meal=dv('m-meal',v.meal),rm=dv('m-rm',!!v.readymade),fav=dv('m-fav',true);
+  var pv=dv('m-p',r?v.protein:''),cv=dv('m-c',r&&!r.noCF?v.carbs:''),fv=dv('m-f',r&&!r.noCF?v.fat:'');
+  var nums='<div class="pair"><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" value="'+esc(String(pv))+'"></label><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" value="'+esc(String(cv))+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" value="'+esc(String(fv))+'"></label></div>';
+  var h=head(r?'Edit my meal':'Add my own meal or snack','Saved on this phone')+
+  '<form class="form" id="mine-form">'+
+  '<label>Name<input type="text" id="m-name" required maxlength="60" placeholder="e.g. My usual chicken and rice" value="'+esc(nm)+'"></label>'+
+  '<label>Meal<select id="m-meal">'+MEALS.slice(1).map(function(m){return '<option value="'+m[0]+'"'+(meal===m[0]?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select></label>'+
+  '<div><b style="display:block;margin-bottom:6px">How do you want to add it?</b><div class="chips"><button type="button" class="chip" data-act="m-mode" data-m="build" aria-pressed="'+(mi.mode==='build')+'">I’ll add the ingredients</button><button type="button" class="chip" data-act="m-mode" data-m="label" aria-pressed="'+(mi.mode==='label')+'">It has a label or menu</button></div></div>';
+  if(mi.mode==='label'){
+    h+='<p class="small muted" style="margin:0">Copy the numbers for one serve from the label, menu or app.</p>'+nums+
+    '<p class="small muted" id="m-kcal" style="margin:-6px 0 0"></p>'+
+    '<label class="check"><input type="checkbox" id="m-rm"'+(rm?' checked':'')+'> Ready-made meal I buy or order</label>'+
+    '<label>Brand or shop <span class="hint">Optional, e.g. My Fitness Kitchn</span><input type="text" id="m-brand" maxlength="40" value="'+esc(dv('m-brand',v.brand||''))+'"></label>'}
+  else if(mi.mode==='build'){
+    h+='<label>Add an ingredient<input type="search" id="m-q" autocomplete="off" placeholder="Start typing, e.g. chicken, rice, banana"></label><div id="m-res" class="chips"></div>'+
+    '<div id="m-items">'+itemsHtml(mi)+'</div>'+
+    '<div class="sizebar" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>How many serves does this make?<br><span class="small muted">Leave at 1 if it’s just for one meal</span></span><span class="sizer" role="group" aria-label="Number of serves"><button type="button" data-act="m-serves" data-d="-1" aria-label="Fewer serves">−</button><b id="m-serves-n" style="min-width:2ch;text-align:center;display:inline-block">'+mi.serves+'</b><button type="button" data-act="m-serves" data-d="1" aria-label="More serves">+</button></span></div>'+
+    '<div id="m-sum"></div>'+
+    '<details class="more"><summary>Edit the numbers</summary><p class="small muted">Only if you know them better, e.g. from a label.</p>'+nums+'<p class="small muted" id="m-kcal" style="margin:-6px 0 0"></p></details>'+
+    '<details class="more"><summary>Type or paste a list instead</summary><label>One per line, with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs</span><textarea id="m-ing"></textarea></label><div class="row"><button class="btn small" type="button" data-act="m-paste">Add these</button></div><p class="small muted" id="m-est" role="status" style="margin:6px 0 0"></p></details>'}
+  if(mi.mode)h+=(r?'':'<label class="check"><input type="checkbox" id="m-fav"'+(fav?' checked':'')+'> Add to my go-tos ★</label>')+
+    '<div class="row"><button class="btn primary" type="submit">'+(r?'Save changes':(sh.slot?'Save and add to '+DAYS[UI.day]:'Save'))+'</button></div>';
+  return h+'<p class="status" id="m-status" role="status"></p></form>'}
 function saveMine(){
-  var st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),p=val('m-p'),c=val('m-c'),f=val('m-f'),rm=DOC.getElementById('m-rm').checked,kc=kcal({protein:p,carbs:c,fat:f});
+  var mi=UI.sheet.mi||{mode:'label',items:[],serves:1},st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),build=mi.mode==='build';
+  if(!mi.mode){st.textContent='Pick how you want to add it first.';return}
   if(!name){st.textContent='Add a name first.';return}
-  if(['m-p','m-c','m-f'].some(function(id){return DOC.getElementById(id).value===''})){st.textContent='Add the protein, carbs and fat for one serve. Put 0 if there is none.';return}
-  if(!(kc>0)){st.textContent='Those amounts add up to zero calories. Check the numbers on the label.';return}
-  var ing=rm?[]:DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),old=UI.sheet.id?byId(UI.sheet.id):null;
+  if(build&&!mi.items.length&&!mi.manual){st.textContent='Add at least one ingredient. Search for it above.';return}
+  var p=val('m-p'),c=val('m-c'),f=val('m-f'),kc=kcal({protein:p,carbs:c,fat:f});
+  if(!build&&['m-p','m-c','m-f'].some(function(id){return DOC.getElementById(id).value===''})){st.textContent='Add the protein, carbs and fat for one serve. Put 0 if there is none.';return}
+  if(!(kc>0)){st.textContent=build?'Those ingredients add up to zero calories. Check the amounts.':'Those amounts add up to zero calories. Check the numbers on the label.';return}
+  var rmEl=DOC.getElementById('m-rm'),rm=!build&&!!(rmEl&&rmEl.checked),br=DOC.getElementById('m-brand'),n=mi.serves||1,old=UI.sheet.id?byId(UI.sheet.id):null;
+  var ing=build?mi.items.map(function(it){var g=itemGrams(it)/n,raw=foodName(it.k).toLowerCase().replace(/\s*\(.*?\)/g,'');
+    if(it.k==='egg')return Math.max(1,Math.round(g/50))+' eggs';if(DRY_GRAIN.test(it.k))raw+=' (uncooked)';return Math.max(1,Math.round(g))+'g '+raw}):(old&&!build?(old.ingredients||[]):[]);
+  if(rm)ing=[];
   var rec={id:old?old.id:('c'+Date.now().toString(36)),custom:true,fixed:true,name:name,meal:DOC.getElementById('m-meal').value,mins:0,protein:p,carbs:c,fat:f,
-    hp:p/24,hv:0,hc:c/25,hf:f/10,tags:[],ingredients:ing,steps:[],style:rm?'grab':'assemble',keeps:7,freezes:false,readymade:rm,brand:DOC.getElementById('m-brand').value.trim()};
+    hp:p/24,hv:0,hc:c/25,hf:f/10,tags:[],ingredients:ing,steps:[],style:rm?'grab':'assemble',keeps:7,freezes:false,readymade:rm,brand:rm&&br?br.value.trim():''};
+  if(build){rec.items=mi.items.map(function(x){return {k:x.k,c:x.c,g:x.g,cooked:!!x.cooked}});rec.serves=n;rec.est=!mi.manual}
   if(old){S.custom=S.custom.map(function(x){return x.id===old.id?rec:x})}else{S.custom.push(rec);var fv=DOC.getElementById('m-fav');if(fv&&fv.checked)S.favs.push(rec.id)}
   var slot=UI.sheet.slot;if(slot){setEnt(DAYS[UI.day],slot,rec.id,1);S.examplePlan=false}
   save();close()}
@@ -657,7 +763,13 @@ root.addEventListener('click',function(e){
   if(a==='tick'||a==='close-bg')return;
   if(a==='view'){go(b.dataset.v);UI.showF=false;render();window.scrollTo(0,0)}
   else if(a==='day'){UI.day=+b.dataset.i;render()}
-  else if(a==='estmine'){estMine()}
+  else if(a==='m-mode'){mineKeep();UI.sheet.mi.mode=b.dataset.m;render();var q=DOC.getElementById('m-q')||DOC.getElementById('m-p');if(q)q.focus()}
+  else if(a==='m-add'){var mi=UI.sheet.mi;mi.items.push({k:b.dataset.k,c:0,g:''});mi.manual=false;var q=DOC.getElementById('m-q');q.value='';DOC.getElementById('m-res').innerHTML='';mineRefresh()}
+  else if(a==='m-chip'){var it=UI.sheet.mi.items[+b.dataset.i];it.c=+b.dataset.c;if(it.c<0&&!it.g){var pp=portions(it.k)[0];it.g=pp?pp[1]:100}UI.sheet.mi.manual=false;mineRefresh();if(it.c<0){var gi=root.querySelector('.m-g[data-i="'+b.dataset.i+'"]');if(gi)gi.focus()}}
+  else if(a==='m-cook'){UI.sheet.mi.items[+b.dataset.i].cooked=b.dataset.v==='1';UI.sheet.mi.manual=false;mineRefresh()}
+  else if(a==='m-del'){UI.sheet.mi.items.splice(+b.dataset.i,1);UI.sheet.mi.manual=false;mineRefresh()}
+  else if(a==='m-serves'){var mi=UI.sheet.mi;mi.serves=Math.max(1,Math.min(24,(mi.serves||1)+(+b.dataset.d)));mi.manual=false;mineRefresh()}
+  else if(a==='m-paste'){minePaste()}
   else if(a==='hs-done'){S.hsDone=true;save();render()}
   else if(a==='hs-later'){UI.hsLater=true;render()}
   else if(a==='hs-show'){S.hsDone=false;UI.hsLater=false;go('week');render();window.scrollTo(0,0)}
@@ -723,7 +835,10 @@ root.addEventListener('input',function(e){
   if(t.id==='imp-link'){UI.imp.link=t.value.trim();return}
   if(t.id==='q'){UI.q=t.value;var list=filtered(UI.meal,UI.q);DOC.getElementById('cards').innerHTML=cards(list);DOC.getElementById('count').textContent=list.length+' recipe'+(list.length===1?'':'s')+' \u00b7 calories shown for your portion'}
   else if(t.id==='pq'){UI.sheet.q=t.value;var tmp=document.createElement('div');tmp.innerHTML=pickHtml();DOC.getElementById('picklist').innerHTML=tmp.querySelector('#picklist').innerHTML}
-  else if(t.id==='m-p'||t.id==='m-c'||t.id==='m-f'){var mk=kcal({protein:val('m-p'),carbs:val('m-c'),fat:val('m-f')});DOC.getElementById('m-kcal').textContent=mk?'That works out to about '+mk+' calories.':'Use the amounts for one serve from the label or menu. Calories work out automatically. Put 0 if there is none.'}
+  else if(t.id==='m-p'||t.id==='m-c'||t.id==='m-f'){if(UI.sheet&&UI.sheet.mi&&UI.sheet.mi.mode==='build')UI.sheet.mi.manual=true;mineSum()}
+  else if(t.id==='m-q'){DOC.getElementById('m-res').innerHTML=foodSearch(t.value).map(function(k){return '<button type="button" class="chip" data-act="m-add" data-k="'+k+'">+ '+esc(foodName(k))+'</button>'}).join('')||(t.value.trim().length>1?'<p class="small muted" style="margin:4px 0">No match. Try a simpler word, or add the numbers under “Edit the numbers”.</p>':'')}
+  else if(t.classList&&t.classList.contains('m-g')){var it=UI.sheet.mi.items[+t.dataset.i];it.g=t.value;UI.sheet.mi.manual=false;mineSum()}
+  else if(t.id==='m-meal'){mineSum()}
   else if(t.id==='e-p'||t.id==='e-c'||t.id==='e-f'){var k=kcal({protein:val('e-p'),carbs:val('e-c'),fat:val('e-f')});DOC.getElementById('e-kcal').textContent='That works out to about '+k+' calories per standard serve.'}});
 root.addEventListener('submit',function(e){
   e.preventDefault();
