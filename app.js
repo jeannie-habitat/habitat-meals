@@ -256,19 +256,19 @@ var CNT={
  'apple':[150,'apple','apples'],
  'avocado':[140,'avocado','avocados'],
  'mango':[250,'mango','mangoes'],
- 'brown onion':[150,'brown onion','brown onions'],
- 'red onion':[150,'red onion','red onions'],
- 'capsicum':[200,'capsicum','capsicums'],
- 'red capsicum':[200,'capsicum','capsicums'],
- 'carrots':[120,'carrot','carrots'],
- 'cucumber':[100,'Lebanese cucumber','Lebanese cucumbers'],
- 'tomatoes':[120,'tomato','tomatoes'],
+ 'brown onion':[150,'medium onion','medium onions',1],
+ 'red onion':[150,'medium red onion','medium red onions',1],
+ 'capsicum':[200,'medium capsicum','medium capsicums',1],
+ 'red capsicum':[200,'medium capsicum','medium capsicums',1],
+ 'carrots':[120,'medium carrot','medium carrots',1],
+ 'cucumber':[100,'Lebanese cucumber','Lebanese cucumbers',1],
+ 'tomatoes':[120,'medium tomato','medium tomatoes',1],
  'cherry tomatoes':[250,'punnet cherry tomatoes (250g)','punnets cherry tomatoes (250g)'],
- 'zucchini':[200,'zucchini','zucchini'],
- 'eggplant':[300,'eggplant','eggplants'],
- 'sweet potato':[300,'sweet potato','sweet potatoes'],
- 'potatoes':[150,'potato','potatoes'],
- 'broccoli':[350,'head broccoli','heads broccoli'],
+ 'zucchini':[200,'medium zucchini','medium zucchini',1],
+ 'eggplant':[300,'medium eggplant','medium eggplants',1],
+ 'sweet potato':[300,'medium sweet potato','medium sweet potatoes',1],
+ 'potatoes':[150,'medium potato','medium potatoes',1],
+ 'broccoli':[350,'medium head','medium heads',1],
  'broccolini':[190,'bunch broccolini','bunches broccolini'],
  'bok choy':[200,'bunch bok choy','bunches bok choy'],
  'celery':[600,'bunch celery','bunches celery'],
@@ -295,12 +295,12 @@ function shopQ(it){var q=it.q,u=it.su,nm=it.name;
   if(u==='x')return nm.charAt(0).toUpperCase()+nm.slice(1);
   if(u==='n'){var c=Math.max(1,Math.ceil(q-0.15));return c+' '+(c===1?(it.sing||nm.replace(/s( \(|$)/,'$1')):nm)}
   var r=q<20?Math.max(1,Math.round(q)):q<100?Math.round(q/5)*5:Math.round(q/10)*10;
-  var big=r>=1000,v=big?(Math.round(r/100)/10)+(u==='ml'?'L':'kg'):r+u;return v+' '+nm}
+  var big=r>=1000,v=big?(Math.round(r/100)/10)+(u==='ml'?'L':'kg'):r+u,t=v+' '+nm;if(it.each){var c=Math.max(1,Math.round(q/it.each));t+=' (about '+c+' '+(c===1?it.sing:it.plur)+')'}return t}
 function aisle(item){var s=item.toLowerCase();for(var i=0;i<AISLES.length;i++)if(AISLES[i][1].test(s))return AISLES[i][0];return 'Herbs, spices and extras'}
 function shoppingList(){
   var items={},n=0,bx={};
   function add(r,m){(r.ingredients||[]).forEach(function(line,ix){var p,k,sh=r.shop&&r.shop[ix];
-      if(sh){(Array.isArray(sh[0])?sh:sh.length?[sh]:[]).forEach(function(e){var nm=e[0],q=e[1],u=e[2],sg=null,cv=u==='g'?CNT[nm.toLowerCase()]:null;if(cv){q=q/cv[0];u='n';sg=cv[1];nm=cv[2]}k='$'+u+'|'+nm.toLowerCase();if(!items[k])items[k]={q:0,su:u,name:nm,sing:sg,base:e[0],n:0};items[k].q+=q*m;items[k].n++});return}
+      if(sh){(Array.isArray(sh[0])?sh:sh.length?[sh]:[]).forEach(function(e){var nm=e[0],q=e[1],u=e[2],cv=u==='g'?CNT[nm.toLowerCase()]:null,sg=null,pl=null,ea=0;if(cv){sg=cv[1];pl=cv[2];if(cv[3])ea=cv[0];else{q=q/cv[0];u='n';nm=cv[2]}}k='$'+u+'|'+nm.toLowerCase();if(!items[k])items[k]={q:0,su:u,name:nm,sing:sg,plur:pl,each:ea,base:e[0],n:0};items[k].q+=q*m;items[k].n++});return}
       p=split(line);
       if(p){k=p.unit+'|'+p.name.toLowerCase();if(!items[k])items[k]={q:0,unit:p.unit,name:p.name,n:0};items[k].q+=p.q*m;items[k].n++}
       else{k='~'+line.toLowerCase();if(!items[k])items[k]={text:line,n:0,check:true};items[k].n++}})}
