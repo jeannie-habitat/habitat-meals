@@ -947,6 +947,20 @@ function gate(msg){
   var f=DOC.getElementById('gate'),inp=DOC.getElementById('gate-code'),m=DOC.getElementById('gate-msg');
   f.addEventListener('submit',function(e){e.preventDefault();var c=inp.value;if(!normCode(c)){m.textContent='Type in the code from your coach.';return}
     m.textContent='Checking…';unlock(c).then(function(R){lsSet(normCode(c));boot(R)}).catch(function(err){m.textContent=err&&err.message==='nocrypto'?'This browser can’t open the meal plan. Try Safari or Chrome.':'That code didn’t work. Check it with your coach.'})})}
+/* ---------- auto-update: when the app is reopened (e.g. from the Home Screen), load the newest version ---------- */
+var UPD_SRC=(document.currentScript&&document.currentScript.src)||'',UPD_V=(UPD_SRC.match(/[?&]v=(\d+)/)||[])[1],UPD_BASE=UPD_SRC.replace(/[?#].*$/,'').replace(/[^/]*$/,''),updWaiting=false,updLast=0;
+function updCheck(){
+  if(!UPD_V||!UPD_BASE||!window.fetch)return;var now=Date.now();if(now-updLast<60000)return;updLast=now;
+  fetch(UPD_BASE+'meals.js',{cache:'reload'}).then(function(r){return r.ok?r.text():''}).then(function(t){
+    var m=t.match(/v="(\d+)"/);if(!m||m[1]===UPD_V)return;
+    try{if(sessionStorage.getItem('hmb-upd')===m[1])return}catch(e){}
+    if(DOC.querySelector('.sheet')||DOC.activeElement&&/INPUT|TEXTAREA|SELECT/.test(DOC.activeElement.tagName)){updWaiting=true;updLast=0;return}
+    try{sessionStorage.setItem('hmb-upd',m[1])}catch(e){}
+    location.reload()}).catch(function(){})}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')updCheck()});
+window.addEventListener('pageshow',function(e){if(e.persisted)updCheck()});
+setTimeout(updCheck,4000);setInterval(function(){if(updWaiting&&document.visibilityState==='visible'&&!DOC.querySelector('.sheet')){updWaiting=false;updCheck()}},30000);
+
 var saved=lsGet();
 if(saved)unlock(saved).then(boot).catch(function(){lsSet('');gate('The access code has changed. Ask your coach for the new one.')});else gate('');
 
