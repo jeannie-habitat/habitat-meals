@@ -197,7 +197,7 @@ function vWeek(){
   h+='</section>';
   var t=dayTotals(d),T=S.targets,pct=Math.min(100,T.kcal?t.kcal/T.kcal*100:0),over=t.kcal>T.kcal*1.05;
   if(t.n){
-    h+='<section class="panel totals" aria-label="Day totals"><div class="kcal"><span><b>'+t.kcal+'</b> of '+T.kcal+' kcal</span><span class="num">'+t.p+'g protein</span></div><div class="bar'+(over?' over':'')+'"><span style="width:'+pct+'%"></span></div>'+
+    h+='<section class="panel totals" aria-label="Day totals"><div class="kcal"><span><b>'+t.kcal+'</b> of '+T.kcal+' kcal</span><span class="num">'+t.p+'g protein</span></div><div class="bar'+(over?' over':'')+'"><span style="width:'+pct+'%"></span></div>'+calNote(t,T)+
       '<details class="more"><summary>Hand portions</summary><div class="totals" style="margin-top:8px">'+portionRow('Protein (palms)',t.hp,T.hp)+portionRow('Veg (fists)',t.hv,T.hv)+portionRow('Carbs (cupped hands)',t.hc,T.hc)+portionRow('Fats (thumbs)',t.hf,T.hf)+'</div></details></section>';
   }
   if(!weekEmpty()){
@@ -207,6 +207,11 @@ function vWeek(){
       '<h3>Whole week</h3><div class="row">'+(weekGaps?'<button class="btn small" data-act="gen-week">✨ Fill the gaps for me</button>':'')+(S.favs.length&&weekGaps?'<button class="btn small" data-act="fill-gotos">Fill gaps with my go-tos</button>':'')+
       (UI.wk===0?'<button class="btn small" data-act="copy-week">Copy to next week</button>':'')+'<button class="btn small ghost" data-act="clear-week">Clear week</button></div></div>'}
   return h}
+function calNote(t,T){
+  var tg=+T.kcal||0;if(!tg)return '';var diff=Math.round((t.kcal-tg)/10)*10;
+  if(t.kcal>tg*1.05)return '<p class="small warn" style="margin:8px 0 0">You\u2019re about '+diff+' kcal over your target today. Tap a meal to swap it or make the portion smaller.</p>';
+  if(t.n>=AS().length&&t.kcal<tg*0.95)return '<p class="small warn" style="margin:8px 0 0">You\u2019re about '+(-diff)+' kcal under your target today. Tap a meal to make the portion bigger or add a snack.</p>';
+  return ''}
 function portionRow(label,got,target){
   var n=Math.max(Math.ceil(target),Math.ceil(got)),d='';
   for(var i=0;i<n;i++){var c='dot';if(got>=i+1)c+=' full';else if(got>i)c+=' half';if(i>=target)c+=' over';d+='<span class="'+c+'"></span>'}
