@@ -220,7 +220,7 @@ function portionRow(label,got,target){
 
 function filtered(mealFilter,q){
   var list=ALL().filter(function(r){
-    if(mealFilter&&mealFilter!=='all'){if(mealFilter==='snack-or-dessert'){if(r.meal!=='snack'&&r.meal!=='dessert')return false}else if(r.meal!==mealFilter)return false}
+    if(mealFilter&&mealFilter!=='all'){if(mealFilter==='snack-or-dessert'){if(r.meal!=='snack'&&r.meal!=='dessert')return false}else if(mealFilter==='main'){if(r.meal!=='lunch'&&r.meal!=='dinner')return false}else if(r.meal!==mealFilter)return false}
     if(UI.mine&&!fitsMe(r))return false;
     if(UI.quick&&r.mins>15)return false;
     if(UI.nocook&&r.style==='cook')return false;
@@ -488,7 +488,7 @@ function detailHtml(r){
     h+='<div class="actbox">'+(r.custom?'':'<div class="sizebar"><span>Portion<br><span class="small muted">Sized for you. Change if you’re hungrier.</span></span>'+sizer('slotsz2',x,'')+'</div>')+'<div class="row"><button class="btn" data-act="swap">Swap meal</button><button class="btn" data-act="copy-one">Copy to other days</button><button class="btn" data-act="remove">Remove</button>'+favBtn+'</div></div>'}
   else if(s.slot){h+='<div class="row actbox"><button class="btn primary" data-act="assign" data-id="'+r.id+'">Add to '+DAYS[UI.day]+' '+dayDate(UI.wk,UI.day).getDate()+' '+slotName(s.slot).toLowerCase()+'</button>'+favBtn+'</div>'}
   else{
-    var n=s.serves||1,slots=AS().filter(function(z){return slotFits(z[0],r)});if(!slots.length)slots=SLOTS.filter(function(z){return slotFits(z[0],r)});
+    var n=s.serves||1,slots=AS().filter(function(z){return slotFits(z[0],r,1)});if(!slots.length)slots=SLOTS.filter(function(z){return slotFits(z[0],r,1)});
     h+='<div class="actbox"><div class="pair"><label>Meal<select id="add-slot">'+slots.map(function(z){return '<option value="'+z[0]+'"'+(s.slotSel===z[0]?' selected':'')+'>'+z[1]+'</option>'}).join('')+'</select></label><label>From ('+(UI.wk?'next':'this')+' week)<select id="add-day">'+DAYS.map(function(d,i){return '<option value="'+i+'"'+(i===(s.dayStart!=null?s.dayStart:(n>1&&UI.day>=5?0:UI.day))?' selected':'')+'>'+d+' '+dayDate(UI.wk,i).getDate()+'</option>'}).join('')+'</select></label></div>'+
       '<div class="sizebar"><span>Days<br><span class="small muted">'+(n>1?'Cook once, eat it '+n+' days':'Just once')+'</span></span><span class="sizer" role="group" aria-label="Number of days"><button data-act="serves" data-dir="-1" aria-label="Fewer days"'+(n<=1?' disabled':'')+'>−</button><span>'+n+'</span><button data-act="serves" data-dir="1" aria-label="More days"'+(n>=7?' disabled':'')+'>+</button></span></div>'+
       prepWarn(r,n)+'<div class="row"><button class="btn primary" data-act="add" data-id="'+r.id+'">'+(n>1?'Add '+n+' days':'Add to my week')+'</button>'+favBtn+'</div></div>'}
@@ -512,9 +512,9 @@ function prepWarn(r,n){
   return '<p class="small muted">Keeps '+r.keeps+' days in the fridge.</p>'}
 function slotName(k){for(var i=0;i<SLOTS.length;i++)if(SLOTS[i][0]===k)return SLOTS[i][1];return ''}
 function slotMeal(k){return k==='snack1'||k==='snack2'?'snack-or-dessert':k}
-function slotFits(k,r){var m=slotMeal(k);return m==='snack-or-dessert'?(r.meal==='snack'||r.meal==='dessert'):r.meal===m}
+function slotFits(k,r,loose){var m=slotMeal(k);if(loose&&(m==='lunch'||m==='dinner')&&(r.meal==='lunch'||r.meal==='dinner'))return true;return m==='snack-or-dessert'?(r.meal==='snack'||r.meal==='dessert'):r.meal===m}
 function pickHtml(){
-  var k=UI.sheet.slot,list=filtered(slotMeal(k),UI.sheet.q||'');
+  var k=UI.sheet.slot,km=slotMeal(k),list=filtered(km==='lunch'||km==='dinner'?'main':km,UI.sheet.q||'');
   var favs=list.filter(function(r){return S.favs.indexOf(r.id)>=0}),rest=list.filter(function(r){return S.favs.indexOf(r.id)<0});
   var row=function(r){var m=mac(r,sizeFor(r,k));return '<div class="pickrow"><button class="pick" data-act="assign" data-id="'+r.id+'">'+photo(r,'thumb')+'<span class="pn"><b>'+esc(r.name)+'</b><span class="small muted">'+(r.custom?minsTxt(r):r.mins+' min'+(r.style!=='cook'?' · no cooking':''))+'</span></span><span class="pm small muted num">'+m.kcal+' kcal<br>'+m.p+'g protein</span></button><button class="btn small ghost" data-act="peek" data-id="'+r.id+'" aria-label="See recipe for '+esc(r.name)+'">View</button></div>'};
   var h=head('Add '+DAYS[UI.day]+' '+dayDate(UI.wk,UI.day).getDate()+' '+slotName(k).toLowerCase(),'Tap a meal to add it')+'<div class="row" style="margin-bottom:10px"><button class="btn small" data-act="mine-new">+ Add my own meal or snack</button></div><div class="filters">'+filterBox('pq',UI.sheet.q||'','Search',false)+'</div><div id="picklist">';
