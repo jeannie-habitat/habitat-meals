@@ -531,11 +531,86 @@ function mineHtml(){
   '<label>Meal<select id="m-meal">'+MEALS.slice(1).map(function(m){return '<option value="'+m[0]+'"'+(v.meal===m[0]?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select></label>'+
   '<label class="check"><input type="checkbox" id="m-rm"'+(v.readymade?' checked':'')+'> Ready-made meal I buy or order</label>'+
   '<label>Brand or shop <span class="hint">Optional, e.g. My Fitness Kitchn</span><input type="text" id="m-brand" maxlength="40" value="'+esc(v.brand||'')+'"></label>'+
+  (v.readymade?'':'')+'<details class="more" id="m-ingbox" open><summary>Ingredients (I only know the ingredients)</summary><label>One per line, starting with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs. They also go on your shopping list. Skip for ready-made meals.</span><textarea id="m-ing">'+esc((v.ingredients||[]).join('\n'))+'</textarea></label><div class="row"><button class="btn small" type="button" data-act="estmine">Work out protein, carbs and fat</button></div><p class="small muted" id="m-est" role="status" style="margin:6px 0 0"></p></details>'+
   '<div class="pair"><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" required value="'+v.protein+'"></label><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.carbs)+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" required value="'+(r&&r.noCF?'':v.fat)+'"></label></div>'+
   '<p class="small muted" id="m-kcal" style="margin:-6px 0 0">'+(r&&!r.noCF?'That works out to about '+kc+' calories.':'Use the amounts for one serve from the label or menu. Calories work out automatically. Put 0 if there is none.')+'</p>'+
-  '<details class="more"'+((v.ingredients||[]).length?' open':'')+'><summary>Ingredients for my shopping list (optional)</summary><label>One per line, starting with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs. Skip this for ready-made meals.</span><textarea id="m-ing">'+esc((v.ingredients||[]).join('\n'))+'</textarea></label></details>'+
   (r?'':'<label class="check"><input type="checkbox" id="m-fav" checked> Add to my go-tos ★</label>')+
   '<div class="row"><button class="btn primary" type="submit">'+(r?'Save changes':(sh.slot?'Save and add to '+DAYS[UI.day]:'Save'))+'</button></div><p class="status" id="m-status" role="status"></p></form>'}
+/* ---------- estimate macros from ingredients ---------- */
+// Ingredient-based macro estimate (prototype; will be embedded in app.js)
+var EST_IGN=/^(?:(?:an? |a few |a pinch of |a pinch |a splash of |a dash of |a drizzle of |a squeeze of |a sprinkle of |a handful of |a few sprays of |\d+ sprays? of |a \d+-second spray of |\d+ ?(?:small |large )?cloves? |ground |dried |fresh |kosher |heaped )*)(?:clove garlic|cloves garlic|garlic cloves?|garlic|olive oil spray|oil spray|cooking spray|salt|ice|water|espresso|shot espresso|coffee|sea salt|pepper|black pepper|white pepper|cracked pepper|garlic|chilli|chili|chilli flakes|lemon|lime|vinegar|[a-z ]*vinegar|spices?|seasoning|cumin|paprika|smoked paprika|turmeric|cinnamon|oregano|thyme|rosemary|herbs?|fresh herbs|basil|coriander|parsley|mint|dill|chives|ginger|stevia|baking powder|bicarb[a-z ]*|vanilla|vanilla extract|water|ice|mustard|dijon mustard|tabasco|lemongrass|star anise|garam masala|curry powder|msg|spring onion|spring onions|lemon juice|lime juice|nutmeg|cardamom|chinese five spice|italian seasoning|taco seasoning|shawarma spice|everything bagel seasoning|garlic powder|onion powder|cayenne|fresh chilli|fresh ginger|fresh coriander|fresh mint|fresh basil|fresh parsley|fresh dill|fresh chives|fresh thai basil)\b/;
+var EST_RULES=[
+ [/(microwave|pouch|cooked).*brown rice|brown rice.*(pouch|cooked)/,'brown_rice'],[/(microwave|pouch).*rice/,'white_rice'],
+ [/lasagne|lasagna/,'pasta'],[/dumplings?/,'dumplings'],[/protein bar/,'protein_bar'],
+ [/(cooked|bbq|roast|roasted|shredded|rotisserie|chook)\b.*chicken|chicken.*(cooked|bbq|shredded|rotisserie)|chook/,'chicken_cooked'],
+ [/chicken mince/,'chicken_mince'],[/chicken thigh/,'chicken_thigh'],[/chicken/,'chicken_breast'],
+ [/beef (stir|strips)|stir-fry (beef|strips)/,'beef_strips'],[/(beef|steak|rump|sirloin|scotch|eye fillet)/,'steak'],[/mince/,'beef_mince'],
+ [/turkey mince/,'turkey_mince'],[/(sliced |deli |shaved )?turkey/,'deli_turkey'],[/pork mince/,'pork_mince'],[/lamb mince|lamb/,'lamb_mince'],
+ [/roast beef/,'roast_beef'],[/rashers?|bacon/,'bacon'],[/ham\b/,'ham'],[/jerky/,'jerky'],
+ [/smoked salmon/,'smoked_salmon'],[/tin(ned)? (red )?salmon|canned salmon/,'tin_salmon'],[/salmon/,'salmon'],
+ [/tuna.*(flavoured|pouch)|flavoured tuna/,'tuna_flav'],[/tuna/,'tuna'],[/cooked.*prawn|prawn.*cooked/,'prawns_cooked'],[/prawn|shrimp/,'prawns'],
+ [/fish|barramundi|basa|snapper|whiting/,'white_fish'],
+ [/egg whites?/,'egg_white'],[/\begg\b|\beggs\b/,'egg'],
+ [/(high[- ]protein|hp|yopro|chobani fit).*(flavoured|flavored)|flavoured.*(high[- ]protein|yopro)/,'hp_yog_flav'],
+ [/high[- ]protein.*(greek )?yog(h)?urt|protein yog(h)?urt|yopro/,'hp_yoghurt'],[/soy yog(h)?urt/,'soy_yoghurt'],[/greek yog(h)?urt|yog(h)?urt/,'greek_yog'],
+ [/cottage/,'cottage'],[/ricotta/,'ricotta'],[/burrata/,'burrata'],[/feta/,'feta'],[/parmesan/,'parmesan'],[/mozzarella/,'mozzarella'],
+ [/(light|reduced fat|lite).*cheese|cheese.*(light|lite)|grated cheese/,'light_cheese'],[/cheddar|tasty cheese|cheese/,'cheddar'],
+ [/fat[- ]free cream cheese/,'ff_cc'],[/(light|lite) cream cheese/,'light_cc'],[/cream cheese/,'cream_cheese'],
+ [/babybel/,'babybel'],[/tzatziki/,'tzatziki'],[/hummus/,'hummus'],
+ [/high[- ]protein.*milk|protein milk/,'protein_milk'],[/almond milk/,'almond_milk'],[/soy milk/,'soy_milk'],[/oat cream/,'oat_cream'],[/coconut milk|coconut cream/,'coconut_light'],[/evaporated milk/,'evap_milk'],[/light cream|cream\b/,'light_cream'],[/milk/,'milk'],
+ [/butter\b(?!.*chicken)/,'butter'],[/margarine/,'marg'],
+ [/whey|protein powder|plant protein|protein isolate/,'whey'],
+ [/tofu/,'tofu'],[/tempeh/,'tempeh'],[/tvp|soy mince/,'tvp'],[/edamame/,'edamame'],
+ [/red lentils?/,'red_lentils'],[/lentils?/,'lentils_tin'],[/chickpeas?/,'chickpeas'],[/black beans?/,'black_beans'],[/kidney beans?/,'kidney_beans'],[/cannellini|white beans?|butter beans?/,'cannellini'],
+ [/rolled oats|oats|porridge/,'oats'],[/muesli/,'muesli'],[/granola/,'granola'],[/weet-?bix|wheat biscuits?/,'weetbix'],[/rice bubbles/,'rice_bubbles'],
+ [/(cooked|steamed|microwave).*rice|rice.*(cooked|steamed|microwave)/,'white_rice'],[/rice noodles?|vermicelli/,'rice_noodles'],[/rice paper/,'rice_paper'],[/rice cakes?/,'rice_cakes'],[/rice crackers/,'rice_crackers'],[/brown rice/,'rice_dry'],[/rice/,'rice_dry'],
+ [/protein pasta/,'protein_pasta'],[/pulse pasta|chickpea pasta/,'pulse_pasta'],[/wholemeal pasta|whole wheat pasta/,'wm_pasta'],[/gnocchi/,'gnocchi'],[/tortellini|ravioli/,'tortellini'],[/fresh pasta/,'fresh_pasta'],[/pasta|spaghetti|penne|fusilli|macaroni|linguine/,'pasta'],
+ [/soba/,'soba'],[/egg noodles|ramen|noodles/,'egg_noodles'],[/couscous/,'couscous_dry'],[/quinoa/,'quinoa_dry'],
+ [/sweet potato|kumara/,'sweet_potato'],[/potato/,'potato'],[/pumpkin|butternut/,'pumpkin'],
+ [/sourdough/,'sourdough'],[/wrap|tortilla wrap|mission/,'wrap'],[/corn tortilla/,'corn_tortilla'],[/pita|pitta|lebanese bread/,'pita'],[/bagel/,'bagel'],[/croissant/,'croissant'],[/sandwich thins|burger.*thins|thins/,'thins'],[/taco shell/,'taco_shell'],[/roll\b|bun\b/,'roll'],[/bread|toast/,'bread'],[/crackers?|cruskits?|crispbread/,'crackers'],[/panko|breadcrumbs/,'panko'],[/corn chips|tortilla chips/,'corn_chips'],[/popcorn/,'popcorn'],
+ [/banana/,'banana'],[/berries|blueberr|strawberr|raspberr/,'berries'],[/apple\s?sauce/,'applesauce'],[/apple/,'apple'],[/mandarin|orange/,'mandarin'],[/mango/,'mango'],[/kiwi/,'kiwi'],[/cherr/,'cherries'],[/peach/,'peach'],[/dates?\b/,'dates'],
+ [/broccoli|broccolini/,'broccoli'],[/spinach|kale|silverbeet/,'spinach'],[/capsicum|bell pepper/,'capsicum'],[/cherry tomato|tomato(es)?\b(?!.*(paste|sauce|tin|crushed|passata))/,'tomato'],[/cucumber/,'cucumber'],[/lettuce|cos\b|iceberg|salad leaves|mixed leaves|rocket/,'lettuce'],[/zucchini/,'zucchini'],[/mushroom/,'mushroom'],[/carrot/,'carrot'],[/onion/,'onion'],[/cauliflower/,'cauliflower'],[/green beans/,'green_beans'],[/stir[- ]fry veg|asian veg/,'asian_veg'],[/slaw|cabbage/,'slaw'],[/snow peas?|sugar snap/,'snow_peas'],[/celery/,'celery'],[/bok choy/,'bok_choy'],[/sprouts/,'sprouts'],[/eggplant|aubergine/,'eggplant'],[/corn\b|sweet corn/,'corn'],[/peas\b|mixed veg|vegetables?|veg\b|salad/,'mixed_veg'],[/watercress/,'watercress'],[/beetroot/,'mixed_veg'],[/avocado/,'avocado'],
+ [/pickle/,'pickles'],[/olives?/,'olives'],[/artichoke/,'artichoke'],[/sun-?dried/,'sundried'],[/kimchi/,'kimchi'],[/tabou?li/,'tabouli'],
+ [/olive oil|oil\b|cooking spray/,'olive_oil'],[/sesame oil/,'sesame_oil'],
+ [/peanut butter|almond butter|nut butter/,'pb'],[/tahini/,'tahini'],[/chia/,'chia'],[/flax|linseed/,'flax'],[/walnuts?/,'walnuts'],[/almond meal/,'almonds'],[/almonds?/,'almonds'],[/peanuts?/,'peanuts'],[/cashews?/,'cashews'],[/pepitas|pumpkin seeds/,'pepitas'],[/sesame seeds?/,'sesame'],[/sunflower|seeds/,'seeds'],[/desiccated coconut|shredded coconut/,'coconut'],[/nut mix|trail mix|fruit and nut/,'fruit_nut_mix'],
+ [/light mayo|lite mayo|light mayonnaise/,'light_mayo'],[/fat[- ]free (kewpie |)mayo/,'ff_mayo'],[/half[- ]fat|kewpie/,'hf_mayo'],[/mayo/,'mayo'],[/ranch/,'ranch'],[/pesto/,'pesto'],[/salsa/,'salsa'],[/passata/,'passata'],[/crushed tomato|diced tomato|tinned tomato|canned tomato/,'crushed_tom'],[/tomato paste/,'tom_paste'],[/tomato (sauce|ketchup)|ketchup/,'bbq_sauce'],[/curry paste|tom yum|tandoori|butter chicken paste/,'curry_paste'],[/soy sauce|tamari/,'soy'],[/oyster/,'oyster'],[/hoisin/,'hoisin'],[/teriyaki|tonkatsu/,'teriyaki'],[/sweet chilli/,'sweet_chilli'],[/fish sauce/,'fish_sauce'],[/bbq sauce|barbecue/,'bbq_sauce'],[/sriracha|hot sauce|chilli sauce|chilli crisp/,'sriracha'],[/gochujang/,'gochujang'],[/miso/,'miso'],[/mirin/,'mirin'],[/stock|broth/,'stock'],[/balsamic glaze/,'balsamic_glaze'],[/balsamic/,'balsamic'],[/tamarind/,'tamarind'],[/vegemite/,'vegemite'],
+ [/honey/,'honey'],[/maple/,'maple'],[/sugar[- ]free (maple )?syrup/,'sf_syrup'],[/sugar|caster|brown sugar/,'sugar'],[/cocoa|cacao/,'cocoa'],[/dark choc|chocolate chips|choc chips/,'dark_choc'],[/chocolate/,'milk_choc'],[/nutella/,'nutella'],[/flour/,'flour'],[/cornflour|cornstarch/,'cornflour'],[/coffee/,'coffee']
+];
+EST_RULES.unshift([/milky way|fun size|snickers|mars bar|twix|kit ?kat|\bbar\b.*\(/,'__none'],[/stock|broth|bouillon/,'stock'],[/fish sauce/,'fish_sauce'],[/olive oil|(?:^|\s)oil\b|cooking spray/,'olive_oil'],[/cherry tomato/,'tomato'],[/lettuce cups?/,'lettuce_cup']);
+var EST_PC={bacon:30,olives:4,dumplings:25,dumpling:25,sriracha:5,protein_bar:60,egg:50,egg_white:33,banana:120,apple:150,mandarin:80,kiwi:75,avocado:150,mango:250,tomato:120,onion:150,capsicum:200,carrot:120,potato:150,sweet_potato:250,zucchini:200,cucumber:100,eggplant:300,bread:40,sourdough:50,wrap:60,pita:60,bagel:90,thins:50,roll:60,croissant:60,taco_shell:12,corn_tortilla:30,rice_paper:8,rice_cakes:9,crackers:6,babybel:20,lettuce:400,peach:150,dates:8,mushroom:20,cherries:8};
+var EST_CUP={oats:90,rice_dry:190,flour:125,spinach:30,lettuce:40,berries:150,corn:160,quinoa_dry:170,mixed_veg:150,cheddar:110,light_cheese:110,greek_yog:245,hp_yoghurt:250,cottage:220,milk:250,almond_milk:250,soy_milk:250,broccoli:90,carrot:130,zucchini:120,mushroom:70,pasta:100,rice_noodles:60,couscous_dry:170,white_rice:160,granola:100,muesli:100,slaw:90,sprouts:30,cauliflower:100,capsicum:140,tomato:150,cucumber:130,onion:160,egg_white:240,whey:120,chickpeas:160,black_beans:180,lentils_tin:190,red_lentils:190,kidney_beans:180,cannellini:180,edamame:150};
+function estGrams(p,key){
+  var q=p.q,u=p.unit,pm=!u&&p.name.match(/\((?:about |approx\.? |around )?(\d+(?:\.\d+)?)\s*(?:g|ml)\)/);if(pm)return q*parseFloat(pm[1]);
+  if(u==='g'||u==='ml')return q;if(u==='kg'||u==='L')return q*1000;
+  if(u==='tsp')return q*5;if(u==='tbsp')return q*(key==='pb'||key==='honey'?20:15);
+  if(/^cups?$/.test(u))return q*(EST_CUP[key]||240);
+  if(key==='lettuce_cup'||/^(lettuce|iceberg|cos).*cups?$/.test(p.name))return q*15;
+  if(/^(thin |small )?slices?\b/.test(p.name)&&!u){return q*(key==='onion'||key==='tomato'||key==='cucumber'?12:key==='bread'||key==='sourdough'?40:key==='cheddar'||key==='light_cheese'?20:15)}
+  if(/cherry tomato/.test(p.name))return q*12;
+  var w=EST_PC[key];if(key==='bread'&&/sourdough/.test(p.name))w=50;return w?q*w:null}
+function estimate(lines){var NUT=__NUT;
+  var P=0,C=0,F=0,ok=[],bad=[];
+  lines.forEach(function(line){
+    var raw=String(line).trim();if(!raw)return;
+    var p=split(raw),name=(p?p.name:raw).toLowerCase().replace(/^of\s+/,'').replace(/[,(].*$/,function(m){return m}).trim(),nm=name.replace(/\(.*?\)/g,'').trim();
+    if(EST_IGN.test(nm)&&!(p&&p.unit==='g'&&p.q>=20)){ok.push([raw,0]);return}
+    var key=null;for(var i=0;i<EST_RULES.length;i++)if(EST_RULES[i][0].test(nm)){key=EST_RULES[i][1];break}
+    if(key==='lettuce_cup'&&!NUT[key])NUT[key]=NUT.lettuce;if(!key||!NUT[key]){bad.push(raw);return}
+    if(!p){bad.push(raw);return}
+    var g=estGrams(p,key);if(g==null){bad.push(raw);return}
+    if(/\bcooked\b/.test(nm)&&/_dry$/.test(key)&&key!=='rice_dry')g*=0.4;
+    var n=NUT[key];P+=n[0]*g/100;C+=n[1]*g/100;F+=n[2]*g/100;ok.push([raw,Math.round(g),key])});
+  return {p:P,c:C,f:F,ok:ok,bad:bad}}
+
+
+function estMine(){
+  var box=DOC.getElementById('m-est'),txt=DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+  if(!txt.length){box.textContent='Add your ingredients first, one per line, starting with the amount.';return}
+  var r=estimate(txt),n=r.ok.filter(function(x){return x[1]!==0}).length;
+  if(!n){box.textContent='I could not match any of those. Check the amounts, or type the protein, carbs and fat yourself.';return}
+  DOC.getElementById('m-p').value=Math.round(r.p);DOC.getElementById('m-c').value=Math.round(r.c);DOC.getElementById('m-f').value=Math.round(r.f);
+  var mk=kcal({protein:val('m-p'),carbs:val('m-c'),fat:val('m-f')});DOC.getElementById('m-kcal').textContent='That works out to about '+mk+' calories.';
+  box.innerHTML='Estimated for the whole recipe as one serve, assuming raw weights unless you write cooked. Check the numbers above and change them if you know better.'+(r.bad.length?'<br><b>Not counted, so add these by hand:</b> '+r.bad.map(esc).join('; '):'')}
 function saveMine(){
   var st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),p=val('m-p'),c=val('m-c'),f=val('m-f'),rm=DOC.getElementById('m-rm').checked,kc=kcal({protein:p,carbs:c,fat:f});
   if(!name){st.textContent='Add a name first.';return}
@@ -582,6 +657,7 @@ root.addEventListener('click',function(e){
   if(a==='tick'||a==='close-bg')return;
   if(a==='view'){go(b.dataset.v);UI.showF=false;render();window.scrollTo(0,0)}
   else if(a==='day'){UI.day=+b.dataset.i;render()}
+  else if(a==='estmine'){estMine()}
   else if(a==='hs-done'){S.hsDone=true;save();render()}
   else if(a==='hs-later'){UI.hsLater=true;render()}
   else if(a==='hs-show'){S.hsDone=false;UI.hsLater=false;go('week');render();window.scrollTo(0,0)}
