@@ -26,7 +26,7 @@ var KEY='habitat-meal-builder-v3';
 var EX_TARGETS={slots:DEFAULT_SLOTS.slice(),name:'',kcal:1600,hp:4,hv:5,hc:4,hf:4,style:'everything',df:false,gf:false,avoid:'',example:true};
 var S=load()||{};
 if(!S.targets)S.targets=Object.assign({},EX_TARGETS);
-S.favs=S.favs||[];S.ticks=S.ticks||{};if(!S.targets.slots||!S.targets.slots.length)S.targets.slots=DEFAULT_SLOTS.slice();
+S.favs=S.favs||[];S.custom=S.custom||[];S.ticks=S.ticks||{};if(!S.targets.slots||!S.targets.slots.length)S.targets.slots=DEFAULT_SLOTS.slice();
 function mondayOf(off){var d=new Date();d.setHours(12,0,0,0);var g=d.getDay();d.setDate(d.getDate()-(g===0?6:g-1)+7*(off||0));return d}
 function wkKey(off){var d=mondayOf(off);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
 S.plans=S.plans||{};
@@ -39,13 +39,15 @@ var UI={wk:0,view:viewFromHash(),day:todayIdx(),meal:'all',q:'',quick:false,mine
 var art=null,canEdit=false,deleteArmed=null,sampler=null,assets=null,mcpH=null;
 
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify({targets:S.targets,plans:S.plans,setup:S.setup,favs:S.favs,ticks:S.ticks,hsDone:S.hsDone}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({targets:S.targets,plans:S.plans,setup:S.setup,favs:S.favs,custom:S.custom,ticks:S.ticks,hsDone:S.hsDone}))}catch(e){}}
 function todayIdx(){var d=new Date().getDay();return d===0?6:d-1}
 function viewFromHash(){var h=(location.hash||'').slice(1);return ['week','recipes','prep','shopping','targets','coach'].indexOf(h)>=0?h:'week'}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function kcal(r){return Math.round(4*(+r.protein||0)+4*(+r.carbs||0)+9*(+r.fat||0))}
+function kcal(r){if(r.kcalFix)return r.kcalFix;return Math.round(4*(+r.protein||0)+4*(+r.carbs||0)+9*(+r.fat||0))}
 function mac(r,x){return {kcal:Math.round(kcal(r)*x),p:Math.round(r.protein*x),c:Math.round(r.carbs*x),f:Math.round(r.fat*x)}}
-function byId(id){for(var i=0;i<R.length;i++)if(R[i].id===id)return R[i];return null}
+function ALL(){return R.concat(S.custom||[])}
+function byId(id){var A=ALL();for(var i=0;i<A.length;i++)if(A[i].id===id)return A[i];return null}
+function minsTxt(r){return r.custom?(r.readymade?(r.brand?esc(r.brand):'Ready-made'):'My own'):r.mins+' min'}
 function fmt(n){n=Math.round(n*2)/2;return (n%1?n.toFixed(1):String(n))}
 function frac(v){var q=Math.round(v*4)/4,w=Math.floor(q),f=q-w,m={0.25:'¼',0.5:'½',0.75:'¾'}[f]||'';return (w||!m?String(w):'')+m}
 function highProtein(r){var k=kcal(r);return k&&4*r.protein/k>=0.33}
@@ -92,6 +94,7 @@ function batches(r,x){return Math.max(1,Math.ceil(x/r.batch-0.15))}
 function scaleLine(s,x){if(x===1)return s;var p=split(s);return p?fmtQ(p.q*x,p.unit,p.name):s}
 
 function fitsMe(r){
+  if(r.custom)return true;
   var t=S.targets,tags=r.tags||[];
   if(t.style==='vegetarian'&&!(tags.indexOf('vegetarian')>=0||tags.indexOf('plant-based')>=0))return false;
   if(t.style==='pescatarian'&&!(tags.indexOf('vegetarian')>=0||tags.indexOf('plant-based')>=0||tags.indexOf('pescatarian')>=0))return false;
@@ -156,7 +159,7 @@ function weekSwitch(){
   return '<div class="wkswitch" role="group" aria-label="Which week">'+[[0,'This week'],[1,'Next week']].map(function(w){var n=0,pl=S.plans[wkKey(w[0])];if(pl)DAYS.forEach(function(d){SLOTS.forEach(function(z){if(pl[d]&&pl[d][z[0]])n++})});
     return '<button data-act="wk" data-w="'+w[0]+'" aria-pressed="'+(UI.wk===w[0])+'"><b>'+w[1]+'</b><span>'+weekRange(w[0])+(n?' · '+n+' meal'+(n>1?'s':''):'')+'</span></button>'}).join('')+'</div>'}
 function dietOK(r){var keep=fitsCals;fitsCals=function(){return true};var ok=fitsMe(r);fitsCals=keep;return ok}
-function genPool(k,strict){return R.filter(function(r){if(!slotFits(k,r)||!dietOK(r))return false;var v=idealX(r,k);if(r.fixed)return strict?v>=0.6&&v<=1.6:true;return strict?v>=0.7&&v<=1.5:v>=0.45&&v<=2.2})}
+function genPool(k,strict){return ALL().filter(function(r){if(r.custom&&S.favs.indexOf(r.id)<0)return false;if(!slotFits(k,r)||!dietOK(r))return false;var v=idealX(r,k);if(r.fixed)return strict?v>=0.6&&v<=1.6:true;return strict?v>=0.7&&v<=1.5:v>=0.45&&v<=2.2})}
 function genPick(k,avoid,needKeep){
   var pool=genPool(k,true);if(pool.length<4)pool=genPool(k,false);
   var cand=pool.filter(function(r){return avoid.indexOf(r.id)<0&&(!needKeep||needKeep<2||r.style!=='cook'||r.keeps>=needKeep||r.freezes)});
@@ -210,7 +213,7 @@ function portionRow(label,got,target){
   return '<div class="portion"><span>'+label+'</span><span class="dots" aria-hidden="true">'+d+'</span><span class="num">'+fmt(got)+' / '+fmt(target)+'</span></div>'}
 
 function filtered(mealFilter,q){
-  var list=R.filter(function(r){
+  var list=ALL().filter(function(r){
     if(mealFilter&&mealFilter!=='all'){if(mealFilter==='snack-or-dessert'){if(r.meal!=='snack'&&r.meal!=='dessert')return false}else if(r.meal!==mealFilter)return false}
     if(UI.mine&&!fitsMe(r))return false;
     if(UI.quick&&r.mins>15)return false;
@@ -234,14 +237,15 @@ function vRecipes(){
   var list=filtered(UI.meal,UI.q);
   var h='<div class="filters">'+filterBox('q',UI.q,'Search recipes or ingredients',true)+
     '<div class="chips scroll" role="group" aria-label="Meal">'+MEALS.map(function(m){return '<button class="chip" data-act="meal" data-m="'+m[0]+'" aria-pressed="'+(UI.meal===m[0])+'">'+m[1]+'</button>'}).join('')+'</div></div>';
+  h+='<div class="row" style="margin:0 0 12px"><button class="btn small" data-act="mine-new">+ Add my own meal or snack</button></div>';
   h+='<p class="small muted" id="count">'+list.length+' recipe'+(list.length===1?'':'s')+' · calories shown for your portion</p><div class="grid" id="cards">'+cards(list)+'</div>';
   return h}
 function cards(list){
   if(!list.length)return '<div class="empty"><p>No recipes match'+(UI.q?' \u201c'+esc(UI.q)+'\u201d':'')+'.</p><div class="row">'+(UI.q?'<button class="btn small" data-act="clear-search">Clear search</button>':'')+'<button class="btn small ghost" data-act="clear-filters">Reset filters</button></div></div>';
   return list.map(function(r){var fav=S.favs.indexOf(r.id)>=0,x=sizeFor(r,r.meal),m=mac(r,x);
-    return '<button class="card'+(r.photo?' has-ph':'')+'" data-act="detail" data-id="'+r.id+'">'+photo(r,'ph')+'<span class="eyebrow"><span>'+r.meal+(r.cuisine?' \u00b7 '+esc(r.cuisine):'')+'</span>'+(fav?'<span class="star" aria-label="Go-to">★</span>':'')+'</span><span class="name">'+esc(r.name)+'</span>'+(r.hook?'<span class="hook">'+esc(r.hook)+'</span>':'')+'<span class="stats">'+m.kcal+' kcal · '+m.p+'g protein · '+r.mins+' min</span>'+badges(r)+'</button>'}).join('')}
+    return '<button class="card'+(r.photo?' has-ph':'')+'" data-act="detail" data-id="'+r.id+'">'+photo(r,'ph')+'<span class="eyebrow"><span>'+r.meal+(r.cuisine?' \u00b7 '+esc(r.cuisine):'')+'</span>'+(fav?'<span class="star" aria-label="Go-to">★</span>':'')+'</span><span class="name">'+esc(r.name)+'</span>'+(r.hook?'<span class="hook">'+esc(r.hook)+'</span>':'')+'<span class="stats">'+m.kcal+' kcal · '+m.p+'g protein · '+minsTxt(r)+'</span>'+badges(r)+'</button>'}).join('')}
 function photo(r,cls){return r.photo?'<span class="'+cls+'"><img src="/_blob/'+esc(r.photo)+'" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'"></span>':''}
-function badges(r){var b=[];if(r.viral)b.push('<span class="tag viral">Viral</span>');if(highProtein(r))b.push('<span class="tag hp">High protein</span>');if(r.style==='assemble')b.push('<span class="tag">No cooking</span>');if(r.style==='grab')b.push('<span class="tag">Buy ready-made</span>');if(r.freezes)b.push('<span class="tag">Freezes</span>');return b.length?'<span class="tags">'+b.join('')+'</span>':''}
+function badges(r){var b=[];if(r.viral)b.push('<span class="tag viral">Viral</span>');if(highProtein(r))b.push('<span class="tag hp">High protein</span>');if(r.custom)b.push('<span class="tag">'+(r.readymade?'Ready-made · mine':'My own')+'</span>');if(!r.custom&&r.style==='assemble')b.push('<span class="tag">No cooking</span>');if(!r.custom&&r.style==='grab')b.push('<span class="tag">Buy ready-made</span>');if(r.freezes)b.push('<span class="tag">Freezes</span>');return b.length?'<span class="tags">'+b.join('')+'</span>':''}
 
 /* Shopping list order follows a typical Woolies/Coles walk: fresh first, long aisles in the middle, fridge and freezer last. Known ingredients are listed by name; anything new falls back to the word patterns below. */
 var AISLE_LISTS={
@@ -316,7 +320,7 @@ function shopQ(it){var q=it.q,u=it.su,nm=it.name;
 function aisle(item){var s=item.toLowerCase();if(AISLE_MAP[s])return AISLE_MAP[s];for(var i=0;i<AISLES.length;i++)if(AISLES[i][1].test(s))return AISLES[i][0];return 'Other items'}
 function shoppingList(){
   var items={},n=0,bx={};
-  function add(r,m){(r.ingredients||[]).forEach(function(line,ix){var p,k,sh=r.shop&&r.shop[ix];
+  function add(r,m){if(r.readymade){var k0='$rm|'+r.id;if(!items[k0])items[k0]={q:0,su:'n',name:(r.brand?r.brand+' ':'')+r.name,sing:(r.brand?r.brand+' ':'')+r.name,rm:true,n:0};items[k0].q+=m;items[k0].n++;return}(r.ingredients||[]).forEach(function(line,ix){var p,k,sh=r.shop&&r.shop[ix];
       if(sh){(Array.isArray(sh[0])?sh:sh.length?[sh]:[]).forEach(function(e){var nm=e[0],q=e[1],u=e[2],cv=u==='g'?CNT[nm.toLowerCase()]:null,sg=null,pl=null,ea=0;if(cv){sg=cv[1];pl=cv[2];if(cv[3])ea=cv[0];else{q=q/cv[0];u='n';nm=cv[2]}}k='$'+u+'|'+nm.toLowerCase();if(!items[k])items[k]={q:0,su:u,name:nm,sing:sg,plur:pl,each:ea,base:e[0],n:0};items[k].q+=q*m;items[k].n++});return}
       p=split(line);
       if(p){k=p.unit+'|'+p.name.toLowerCase();if(!items[k])items[k]={q:0,unit:p.unit,name:p.name,n:0};items[k].q+=p.q*m;items[k].n++}
@@ -326,10 +330,10 @@ function shoppingList(){
   Object.keys(bx).forEach(function(id){add(bx[id].r,batches(bx[id].r,bx[id].x))});
   var named={};Object.keys(items).forEach(function(k){var it=items[k];if(it.su&&it.su!=='x')named[(it.base||it.name).toLowerCase()]=1});
   Object.keys(items).forEach(function(k){if(items[k].su==='x'&&named[items[k].name.toLowerCase()])delete items[k]});
-  var groups={};Object.keys(items).forEach(function(k){var it=items[k];it.key=k;it.label=it.su?shopQ(it):(it.text||fmtQ(it.q,it.unit,it.name));var a=it.check?'Check you have':aisle(it.text||it.base||it.name);(groups[a]=groups[a]||[]).push(it)});
+  var groups={};Object.keys(items).forEach(function(k){var it=items[k];it.key=k;it.label=it.su?shopQ(it):(it.text||fmtQ(it.q,it.unit,it.name));var a=it.check?'Check you have':it.rm?'Ready-made meals':aisle(it.text||it.base||it.name);(groups[a]=groups[a]||[]).push(it)});
   Object.keys(groups).forEach(function(a){groups[a].sort(function(x,y){return x.label.toLowerCase().replace(/^[\d.¼-¾ ]+(g|ml|kg|tsp|tbsp)?\s*/,'').localeCompare(y.label.toLowerCase().replace(/^[\d.¼-¾ ]+(g|ml|kg|tsp|tbsp)?\s*/,''))})});
   return {groups:groups,meals:n}}
-var ORDER=['Fruit and veg','Bread and bakery','Meat and seafood','Tinned and jarred','Rice, pasta and noodles','Sauces, oils and spreads','Baking and spices','Breakfast and snacks','Dairy, eggs and fridge','Frozen','Other items','Check you have'];
+var ORDER=['Fruit and veg','Bread and bakery','Meat and seafood','Tinned and jarred','Rice, pasta and noodles','Sauces, oils and spreads','Baking and spices','Breakfast and snacks','Dairy, eggs and fridge','Frozen','Other items','Ready-made meals','Check you have'];
 function vShopping(){
   var L=shoppingList(),sw=weekSwitch();
   if(!L.meals)return sw+'<div class="panel"><h2>Your list is empty</h2><p class="muted">Add meals to your week and the shopping list builds itself.</p><button class="btn primary" data-act="view" data-v="week">Plan my week</button></div>';
@@ -450,6 +454,7 @@ function runImport(){
 function sheetHtml(){var s=UI.sheet;
   if(s.type==='detail')return detailHtml(byId(s.id));
   if(s.type==='pick')return pickHtml();
+  if(s.type==='mine')return mineHtml();
   if(s.type==='edit')return editHtml();
   if(s.type==='copy')return copyHtml();return ''}
 function copyHtml(){
@@ -470,11 +475,11 @@ function detailHtml(r){
   if(!r)return head('Recipe not found','');
   var s=UI.sheet,x=s.x,fav=S.favs.indexOf(r.id)>=0,m=mac(r,x);
   var favBtn='<button class="btn" data-act="fav" data-id="'+r.id+'" aria-pressed="'+fav+'">'+(fav?'★ Go-to':'☆ Go-to')+'</button>';
-  var h=head(esc(r.name),r.meal+(r.cuisine?' · '+esc(r.cuisine):'')+' · '+r.mins+' min');
+  var h=head(esc(r.name),r.meal+(r.cuisine?' · '+esc(r.cuisine):'')+' · '+minsTxt(r));
   h+=photo(r,'hero');
-  h+='<div class="macros"><div><b>'+m.kcal+'</b><span>kcal</span></div><div><b>'+m.p+'g</b><span>protein</span></div><div><b>'+m.c+'g</b><span>carbs</span></div><div><b>'+m.f+'g</b><span>fat</span></div></div>';
+  h+='<div class="macros"><div><b>'+m.kcal+'</b><span>kcal</span></div><div><b>'+m.p+'g</b><span>protein</span></div><div><b>'+(r.noCF?'–':m.c+'g')+'</b><span>carbs</span></div><div><b>'+(r.noCF?'–':m.f+'g')+'</b><span>fat</span></div></div>';
   if(s.slot&&s.mode==='view'){
-    h+='<div class="actbox"><div class="sizebar"><span>Portion<br><span class="small muted">Sized for you. Change if you’re hungrier.</span></span>'+sizer('slotsz2',x,'')+'</div><div class="row"><button class="btn" data-act="swap">Swap meal</button><button class="btn" data-act="copy-one">Copy to other days</button><button class="btn" data-act="remove">Remove</button>'+favBtn+'</div></div>'}
+    h+='<div class="actbox">'+(r.custom?'':'<div class="sizebar"><span>Portion<br><span class="small muted">Sized for you. Change if you’re hungrier.</span></span>'+sizer('slotsz2',x,'')+'</div>')+'<div class="row"><button class="btn" data-act="swap">Swap meal</button><button class="btn" data-act="copy-one">Copy to other days</button><button class="btn" data-act="remove">Remove</button>'+favBtn+'</div></div>'}
   else if(s.slot){h+='<div class="row actbox"><button class="btn primary" data-act="assign" data-id="'+r.id+'">Add to '+DAYS[UI.day]+' '+dayDate(UI.wk,UI.day).getDate()+' '+slotName(s.slot).toLowerCase()+'</button>'+favBtn+'</div>'}
   else{
     var n=s.serves||1,slots=AS().filter(function(z){return slotFits(z[0],r)});if(!slots.length)slots=SLOTS.filter(function(z){return slotFits(z[0],r)});
@@ -482,14 +487,16 @@ function detailHtml(r){
       '<div class="sizebar"><span>Days<br><span class="small muted">'+(n>1?'Cook once, eat it '+n+' days':'Just once')+'</span></span><span class="sizer" role="group" aria-label="Number of days"><button data-act="serves" data-dir="-1" aria-label="Fewer days"'+(n<=1?' disabled':'')+'>−</button><span>'+n+'</span><button data-act="serves" data-dir="1" aria-label="More days"'+(n>=7?' disabled':'')+'>+</button></span></div>'+
       prepWarn(r,n)+'<div class="row"><button class="btn primary" data-act="add" data-id="'+r.id+'">'+(n>1?'Add '+n+' days':'Add to my week')+'</button>'+favBtn+'</div></div>'}
   if((r.tags||[]).length)h+='<div class="tags" style="margin-bottom:12px">'+r.tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join('')+'</div>';
-  if(r.batch)h+='<h3>Ingredients <span class="small muted" style="font-weight:400">whole batch, makes '+r.batch+' serves</span></h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul><p class="note">Your portion is '+(x===1?'1 serve':frac(x)+' serves')+' of the '+r.batch+'. The kcal and macros above are for your portion.</p>';
+  if(r.custom&&!(r.ingredients||[]).length)h+='<p class="small muted">'+(r.readymade?'Ready-made. It shows under “Ready-made meals” on your shopping list.':'No ingredients saved, so this isn’t on your shopping list. Tap Edit to add some.')+'</p>';
+  else if(r.batch)h+='<h3>Ingredients <span class="small muted" style="font-weight:400">whole batch, makes '+r.batch+' serves</span></h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ul><p class="note">Your portion is '+(x===1?'1 serve':frac(x)+' serves')+' of the '+r.batch+'. The kcal and macros above are for your portion.</p>';
   else h+='<h3>Ingredients'+(x!==1?' <span class="small muted" style="font-weight:400">for your portion (×'+frac(x)+')</span>':'')+'</h3><ul>'+(r.ingredients||[]).map(function(i){return '<li>'+esc(scaleLine(i,x))+'</li>'}).join('')+'</ul>';
   if(r.gfnote&&S.targets.gf)h+='<p class="note">'+esc(r.gfnote)+'</p>';
   if(r.flavour)h+='<div class="flavour"><b>Make it taste great</b><p>'+esc(r.flavour)+'</p></div>';
-  h+='<h3>Method</h3><ol>'+(r.steps||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ol>';
+  if((r.steps||[]).length)h+='<h3>Method</h3><ol>'+(r.steps||[]).map(function(i){return '<li>'+esc(i)+'</li>'}).join('')+'</ol>';
   if(r.tip)h+='<p class="note">'+esc(r.tip)+'</p>';
   if(r.source)h+='<p class="small muted">Recipe from '+esc(r.source)+'</p>';
-  h+='<p class="small muted">About '+fmt(r.hp*x)+' palm protein · '+fmt(r.hv*x)+' fist veg · '+fmt(r.hc*x)+' cupped hand carbs · '+fmt(r.hf*x)+' thumb fats</p>';
+  if(!r.custom)h+='<p class="small muted">About '+fmt(r.hp*x)+' palm protein · '+fmt(r.hv*x)+' fist veg · '+fmt(r.hc*x)+' cupped hand carbs · '+fmt(r.hf*x)+' thumb fats</p>';
+  if(r.custom)h+='<div class="row" style="margin-top:12px"><button class="btn small" data-act="mine-edit" data-id="'+r.id+'">Edit</button><button class="btn small danger" data-act="mine-del" data-id="'+r.id+'">'+(deleteArmed===r.id?'Tap again to delete':'Delete')+'</button></div>';
   return h}
 function prepWarn(r,n){
   if(n<=1||r.style==='grab')return '';
@@ -502,11 +509,39 @@ function slotFits(k,r){var m=slotMeal(k);return m==='snack-or-dessert'?(r.meal==
 function pickHtml(){
   var k=UI.sheet.slot,list=filtered(slotMeal(k),UI.sheet.q||'');
   var favs=list.filter(function(r){return S.favs.indexOf(r.id)>=0}),rest=list.filter(function(r){return S.favs.indexOf(r.id)<0});
-  var row=function(r){var m=mac(r,sizeFor(r,k));return '<div class="pickrow"><button class="pick" data-act="assign" data-id="'+r.id+'">'+photo(r,'thumb')+'<span class="pn"><b>'+esc(r.name)+'</b><span class="small muted">'+r.mins+' min'+(r.style!=='cook'?' · no cooking':'')+'</span></span><span class="pm small muted num">'+m.kcal+' kcal<br>'+m.p+'g protein</span></button><button class="btn small ghost" data-act="peek" data-id="'+r.id+'" aria-label="See recipe for '+esc(r.name)+'">View</button></div>'};
-  var h=head('Add '+DAYS[UI.day]+' '+dayDate(UI.wk,UI.day).getDate()+' '+slotName(k).toLowerCase(),'Tap a meal to add it')+'<div class="filters">'+filterBox('pq',UI.sheet.q||'','Search',false)+'</div><div id="picklist">';
+  var row=function(r){var m=mac(r,sizeFor(r,k));return '<div class="pickrow"><button class="pick" data-act="assign" data-id="'+r.id+'">'+photo(r,'thumb')+'<span class="pn"><b>'+esc(r.name)+'</b><span class="small muted">'+(r.custom?minsTxt(r):r.mins+' min'+(r.style!=='cook'?' · no cooking':''))+'</span></span><span class="pm small muted num">'+m.kcal+' kcal<br>'+m.p+'g protein</span></button><button class="btn small ghost" data-act="peek" data-id="'+r.id+'" aria-label="See recipe for '+esc(r.name)+'">View</button></div>'};
+  var h=head('Add '+DAYS[UI.day]+' '+dayDate(UI.wk,UI.day).getDate()+' '+slotName(k).toLowerCase(),'Tap a meal to add it')+'<div class="row" style="margin-bottom:10px"><button class="btn small" data-act="mine-new">+ Add my own meal or snack</button></div><div class="filters">'+filterBox('pq',UI.sheet.q||'','Search',false)+'</div><div id="picklist">';
   if(favs.length)h+='<h3 style="margin-bottom:8px">★ My go-tos</h3>'+favs.map(row).join('')+'<h3 style="margin:16px 0 8px">Everything else</h3>';
   h+=rest.length?rest.map(row).join(''):(favs.length?'':'<div class="empty"><p>No meals match.</p><div class="row"><button class="btn small" data-act="clear-search">Clear search</button><button class="btn small ghost" data-act="clear-filters">Reset filters</button></div></div>');
   return h+'</div>'}
+function mineHtml(){
+  var sh=UI.sheet,r=sh.id?byId(sh.id):null,sl=sh.slot?slotMeal(sh.slot):(UI.meal!=='all'?UI.meal:'snack');
+  if(sl==='snack-or-dessert')sl='snack';
+  var v=r||{name:'',meal:sl,protein:'',carbs:'',fat:'',ingredients:[],readymade:false,brand:''};
+  var kc=r?kcal(r):'';
+  return head(r?'Edit my meal':'Add my own meal or snack','Saved on this phone')+
+  '<p class="small muted" style="margin-top:0">Add something you eat a lot. It counts in your daily calories and you can add it to your week like any other meal. It stays as one fixed serve.</p>'+
+  '<form class="form" id="mine-form">'+
+  '<label>Name<input type="text" id="m-name" required maxlength="60" placeholder="e.g. My usual protein shake" value="'+esc(v.name)+'"></label>'+
+  '<label>Meal<select id="m-meal">'+MEALS.slice(1).map(function(m){return '<option value="'+m[0]+'"'+(v.meal===m[0]?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select></label>'+
+  '<label class="check"><input type="checkbox" id="m-rm"'+(v.readymade?' checked':'')+'> Ready-made meal I buy or order</label>'+
+  '<label>Brand or shop <span class="hint">Optional, e.g. My Fitness Kitchn</span><input type="text" id="m-brand" maxlength="40" value="'+esc(v.brand||'')+'"></label>'+
+  '<div class="pair"><label>Calories (kcal)<input type="number" id="m-kcal" inputmode="numeric" min="1" required value="'+kc+'"></label><label>Protein (g)<input type="number" id="m-p" inputmode="decimal" min="0" step="0.5" required value="'+v.protein+'"></label></div>'+
+  '<details class="more"'+(r&&!r.noCF?' open':'')+'><summary>Carbs and fat (optional)</summary><div class="pair"><label>Carbs (g)<input type="number" id="m-c" inputmode="decimal" min="0" step="0.5" value="'+(r&&!r.noCF?v.carbs:'')+'"></label><label>Fat (g)<input type="number" id="m-f" inputmode="decimal" min="0" step="0.5" value="'+(r&&!r.noCF?v.fat:'')+'"></label></div></details>'+
+  '<details class="more"'+((v.ingredients||[]).length?' open':'')+'><summary>Ingredients for my shopping list (optional)</summary><label>One per line, starting with the amount <span class="hint">e.g. 200g chicken breast or 2 eggs. Skip this for ready-made meals.</span><textarea id="m-ing">'+esc((v.ingredients||[]).join('\n'))+'</textarea></label></details>'+
+  (r?'':'<label class="check"><input type="checkbox" id="m-fav" checked> Add to my go-tos ★</label>')+
+  '<div class="row"><button class="btn primary" type="submit">'+(r?'Save changes':(sh.slot?'Save and add to '+DAYS[UI.day]:'Save'))+'</button></div><p class="status" id="m-status" role="status"></p></form>'}
+function saveMine(){
+  var st=DOC.getElementById('m-status'),name=DOC.getElementById('m-name').value.trim(),kc=Math.round(val('m-kcal')),p=val('m-p'),c=val('m-c'),f=val('m-f'),rm=DOC.getElementById('m-rm').checked;
+  if(!name){st.textContent='Add a name first.';return}
+  if(!(kc>0)){st.textContent='Add the calories for one serve.';return}
+  if(4*p>kc*1.15){st.textContent='That protein is more than the calories can hold. Check both numbers on the label.';return}
+  var ing=rm?[]:DOC.getElementById('m-ing').value.split('\n').map(function(s){return s.trim()}).filter(Boolean),old=UI.sheet.id?byId(UI.sheet.id):null;
+  var rec={id:old?old.id:('c'+Date.now().toString(36)),custom:true,fixed:true,name:name,meal:DOC.getElementById('m-meal').value,mins:0,protein:p,carbs:c,fat:f,kcalFix:kc,noCF:!(c||f),
+    hp:p/24,hv:0,hc:c/25,hf:f/10,tags:[],ingredients:ing,steps:[],style:rm?'grab':'assemble',keeps:7,freezes:false,readymade:rm,brand:DOC.getElementById('m-brand').value.trim()};
+  if(old){S.custom=S.custom.map(function(x){return x.id===old.id?rec:x})}else{S.custom.push(rec);var fv=DOC.getElementById('m-fav');if(fv&&fv.checked)S.favs.push(rec.id)}
+  var slot=UI.sheet.slot;if(slot){setEnt(DAYS[UI.day],slot,rec.id,1);S.examplePlan=false}
+  save();close()}
 function editHtml(){
   var r=UI.sheet.draft||(UI.sheet.id?byId(UI.sheet.id):{name:'',meal:'dinner',mins:20,protein:'',carbs:'',fat:'',hp:1,hv:1,hc:1,hf:1,tags:[],ingredients:[],steps:[],tip:'',cuisine:'',style:'cook',keeps:3,freezes:false});
   var TAGS=['vegetarian','pescatarian','plant-based','dairy-free','gluten-free'];
@@ -589,6 +624,9 @@ root.addEventListener('click',function(e){
   else if(a==='copy-day'){DAYS.forEach(function(x){if(x!==d&&dayTotals(x).n===0)AS().forEach(function(s){var en3=ent(d,s[0]);setEnt(x,s[0],en3?en3.r.id:'',en3?en3.x:1)})});S.examplePlan=false;save();render()}
   else if(a==='untick'){var pre=wkKey(UI.wk)+'|';Object.keys(S.ticks).forEach(function(k){if(k.indexOf(pre)===0||k.indexOf('|')<0||/^~|^\|/.test(k))delete S.ticks[k]});save();render()}
   else if(a==='copy-list'){copyList()}
+  else if(a==='mine-new'){deleteArmed=null;open({type:'mine',id:'',slot:(UI.sheet&&UI.sheet.type==='pick')?UI.sheet.slot:null})}
+  else if(a==='mine-edit'){deleteArmed=null;UI.sheet={type:'mine',id:b.dataset.id,slot:null};render()}
+  else if(a==='mine-del'){if(deleteArmed!==b.dataset.id){deleteArmed=b.dataset.id;b.textContent='Tap again to delete'}else{S.custom=S.custom.filter(function(x){return x.id!==b.dataset.id});var fi=S.favs.indexOf(b.dataset.id);if(fi>=0)S.favs.splice(fi,1);deleteArmed=null;save();close()}}
   else if(a==='edit'){deleteArmed=null;open({type:'edit',id:b.dataset.id})}
   else if(a==='del'){if(deleteArmed!==b.dataset.id){deleteArmed=b.dataset.id;b.textContent='Tap again to delete'}else{R=R.filter(function(x){return x.id!==b.dataset.id});deleteArmed=null;publishRecipes('Recipe deleted.')}}
 });
@@ -610,7 +648,8 @@ root.addEventListener('submit',function(e){
   if(e.target.id==='targets-form'){
     S.setup=true;var sl=[].slice.call(root.querySelectorAll('.t-slot:checked')).map(function(i){return i.value});S.targets={slots:sl.length?sl:DEFAULT_SLOTS.slice(),name:S.targets.name||'',kcal:val('t-kcal')||1600,hp:val('t-hp'),hv:val('t-hv'),hc:val('t-hc'),hf:val('t-hf'),style:DOC.getElementById('t-style').value,df:DOC.getElementById('t-df').checked,gf:DOC.getElementById('t-gf').checked,avoid:DOC.getElementById('t-avoid').value,example:false};
     Object.keys(S.plans).forEach(function(k){var pl=S.plans[k];DAYS.forEach(function(d){SLOTS.forEach(function(z){if(S.targets.slots.indexOf(z[0])<0&&pl[d])pl[d][z[0]]=''})})});useWeek(UI.wk);resizeAll();save();render();var st=DOC.getElementById('t-status');if(st)st.textContent='Saved. Your meals have been resized.'}
-  else if(e.target.id==='edit-form'){saveRecipe()}});
+  else if(e.target.id==='edit-form'){saveRecipe()}
+  else if(e.target.id==='mine-form'){saveMine()}});
 function val(id){var v=parseFloat(DOC.getElementById(id).value);return isNaN(v)?0:v}
 
 function fillGotos(){
